@@ -26,6 +26,7 @@ público de propósito, incluindo o `matchzy.db` e os Steam IDs no HTML — o do
 | `matchzy.db` | Banco do MatchZy mais recente (vem do servidor; às vezes chega como `matchzy (1).db` pelo download) |
 | `index.html` | Saída gerada — **nunca editar à mão**, sempre regenerar pelo script |
 | `assets/maps/*.jpg` | Imagens dos mapas (640px) usadas pela página — precisam ir junto com o `index.html` |
+| `assets/favicon.svg`, `assets/apple-touch-icon.png` | Ícone do site (mira âmbar) e versão 180px pra tela inicial do celular |
 | `docs/uso-diario.md` | Rotina diária passo a passo, checagens e comandos |
 | `docs/como-funciona.md` | Regras do ranking, métricas, estrutura do código e como mexer no visual |
 
