@@ -9,7 +9,7 @@ O dono usa isso **todo dia** depois das sessões de mix. Responda em **portuguê
 estático `index.html` com o ranking do mix: pódio, destaques, top mapas, gráfico ADR × K/D,
 classificação com histórico por jogador e o resultado de cada mapa.
 
-Repositório público: `git@github.com:wisecort/mixcs.git` (branch `main`). Tudo aqui é
+Repositório público: `https://github.com/wisecort/mixcs` (branch `main`). Tudo aqui é
 público de propósito, incluindo o `matchzy.db` e os Steam IDs no HTML — o dono autorizou.
 
 ## Arquivos
@@ -64,9 +64,12 @@ Explicação completa e fórmulas: **`docs/como-funciona.md`**.
 
 ## Git
 
-- Remote: `git@github.com:wisecort/mixcs.git`, branch `main`. Commitar tudo (script, banco, HTML, docs).
+- Remote: `https://github.com/wisecort/mixcs.git` (**HTTPS**, não SSH), branch `main`. A autenticação
+  usa o GitHub CLI (`gh`, conta `wisecort`) via `credential.helper` configurado neste repositório.
+- Commitar tudo (script, banco, HTML, docs).
 - Mensagem padrão do commit diário: `Atualiza ranking até DD/MM` (data da última partida).
 - Só faça commit/push quando o dono pedir.
-- Se o push falhar com `Host key verification failed`, o `github.com` não está no
-  `~/.ssh/known_hosts`. Não mexa no SSH do dono — peça pra ele rodar `! ssh -T git@github.com`
-  e aceitar a chave, depois tente de novo.
+- Antes do push, rode `git pull --no-rebase` — o dono às vezes sobe arquivos direto pelo site do
+  GitHub. Se der conflito no `index.html`, **regenere** com o script em vez de escolher um lado.
+- Não use SSH (o `github.com` não está no `known_hosts` do Mac dele). Se o push pedir senha,
+  confira `gh auth status`.

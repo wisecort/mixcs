@@ -88,10 +88,12 @@ python3 matchzy_ranking.py --team-size 4                  # aceita mapas 4x4
 ```bash
 git add -A
 git commit -m "Atualiza ranking até DD/MM"
+git pull --no-rebase     # o dono às vezes sobe arquivos pelo site do GitHub
 git push
 ```
 
 `DD/MM` = data da última partida (aparece no topo da página, em "24/09 a 29/09").
 
-Se o push der `Host key verification failed`, peça pro dono rodar `! ssh -T git@github.com`
-e aceitar a chave do GitHub.
+O remote é HTTPS (`https://github.com/wisecort/mixcs.git`) autenticado pelo `gh`. Se o
+`pull` der conflito no `index.html`, rode `python3 matchzy_ranking.py` de novo e commite o
+resultado. Se o push pedir senha, confira `gh auth status`.
