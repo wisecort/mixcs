@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ranking do Mix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:            #0c0d10;
+    --surface:       #15171b;
+    --surface-2:     #1c1f24;
+    --surface-3:     #252930;
+    --border:        rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.14);
+    --text:          #f4f4f5;
+    --text-2:        #a1a1aa;
+    --text-3:        #8a8a93;
+    --grid:          #24272d;
+    --baseline:      #3a3e46;
+    --accent:        #f5a524;   /* texto/brilho */
+    --accent-mark:   #c98500;   /* barras e pontos (validado p/ superfície escura) */
+    --accent-wash:   rgba(245,165,36,0.10);
+    --accent-glow:   rgba(245,165,36,0.22);
+    --good:          #3ecf6a;
+    --bad:           #ff7a7a;
+    --gold:          #f5c451;
+    --silver:        #c9ced6;
+    --bronze:        #d6925e;
+    --shadow:        0 1px 0 rgba(255,255,255,0.03) inset, 0 12px 32px rgba(0,0,0,0.35);
+    --hero-grid:     rgba(255,255,255,0.035);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      color-scheme: light;
+      --bg:            #f4f3ef;
+      --surface:       #ffffff;
+      --surface-2:     #f6f5f2;
+      --surface-3:     #ecebe6;
+      --border:        rgba(11,11,11,0.08);
+      --border-strong: rgba(11,11,11,0.16);
+      --text:          #0f0f10;
+      --text-2:        #52525b;
+      --text-3:        #5b5b63;
+      --grid:          #e7e5df;
+      --baseline:      #c3c2b7;
+      --accent:        #9a5b00;
+      --accent-mark:   #c97800;
+      --accent-wash:   rgba(201,120,0,0.09);
+      --accent-glow:   rgba(201,120,0,0.16);
+      --good:          #177a35;
+      --bad:           #c23030;
+      --gold:          #b8860b;
+      --silver:        #7b8490;
+      --bronze:        #a0582a;
+      --shadow:        0 1px 2px rgba(11,11,11,0.04), 0 8px 24px rgba(11,11,11,0.06);
+      --hero-grid:     rgba(11,11,11,0.04);
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg:            #f4f3ef;
+    --surface:       #ffffff;
+    --surface-2:     #f6f5f2;
+    --surface-3:     #ecebe6;
+    --border:        rgba(11,11,11,0.08);
+    --border-strong: rgba(11,11,11,0.16);
+    --text:          #0f0f10;
+    --text-2:        #52525b;
+    --text-3:        #5b5b63;
+    --grid:          #e7e5df;
+    --baseline:      #c3c2b7;
+    --accent:        #9a5b00;
+    --accent-mark:   #c97800;
+    --accent-wash:   rgba(201,120,0,0.09);
+    --accent-glow:   rgba(201,120,0,0.16);
+    --good:          #177a35;
+    --bad:           #c23030;
+    --gold:          #b8860b;
+    --silver:        #7b8490;
+    --bronze:        #a0582a;
+    --shadow:        0 1px 2px rgba(11,11,11,0.04), 0 8px 24px rgba(11,11,11,0.06);
+    --hero-grid:     rgba(11,11,11,0.04);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; }
+  .num { font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    position: relative; overflow: hidden;
+    border-bottom: 1px solid var(--border);
+    background:
+      radial-gradient(900px 380px at 85% -10%, var(--accent-glow), transparent 60%),
+      radial-gradient(600px 300px at -10% 120%, var(--accent-wash), transparent 60%),
+      var(--bg);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--hero-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--hero-grid) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(to bottom, black, transparent 90%);
+    -webkit-mask-image: linear-gradient(to bottom, black, transparent 90%);
+  }
+  .hero .wrap { position: relative; padding-top: 36px; padding-bottom: 32px; }
+  .hero-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2); }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .theme-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: inherit; font-size: 12px; font-weight: 500; color: var(--text-2);
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 999px; padding: 7px 12px; cursor: pointer;
+  }
+  .theme-btn:hover { color: var(--text); }
+  .theme-btn svg.i { width: 15px; height: 15px; }
+  h1 {
+    margin: 0; font-size: clamp(44px, 8vw, 88px); line-height: 0.9; font-weight: 800;
+    letter-spacing: -0.01em; text-transform: uppercase;
+  }
+  h1 .accent { color: var(--accent); }
+  .hero-sub { margin: 14px 0 0; color: var(--text-2); font-size: 14px; }
+  .hero-sub b { color: var(--text); font-weight: 600; }
+
+  .kpis {
+    margin-top: 28px; display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
+  }
+  .kpi { padding: 16px 20px; border-left: 1px solid var(--border); }
+  .kpi:first-child { border-left: 0; }
+  .kpi .l { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .kpi .v { font-size: 38px; font-weight: 700; line-height: 1; margin-top: 6px; }
+  @media (max-width: 760px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .kpi { border-left: 0; border-top: 1px solid var(--border); }
+    .kpi:nth-child(-n+2) { border-top: 0; }
+    .kpi:nth-child(even) { border-left: 1px solid var(--border); }
+    .kpi:last-child { grid-column: span 2; border-left: 0; }
+  }
+
+  /* ---------- filtro fixo ---------- */
+  .filterbar {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .filterbar .wrap { display: flex; align-items: center; gap: 12px; padding-top: 10px; padding-bottom: 10px; flex-wrap: wrap; }
+  .filterbar .lbl { font-size: 12px; color: var(--text-3); font-weight: 500; }
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button {
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--text-2);
+    background: none; border: 0; border-radius: 7px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] { background: var(--accent-wash); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-glow); }
+  .search-wrap { margin-left: auto; position: relative; }
+  .search-wrap svg.i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-3); pointer-events: none; }
+  .search {
+    font: inherit; font-size: 13px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px 8px 32px; width: 220px; max-width: 100%;
+  }
+  .search::placeholder { color: var(--text-3); }
+  .search:focus { outline: 2px solid var(--accent-mark); outline-offset: -1px; }
+  @media (max-width: 640px) { .search-wrap { margin-left: 0; width: 100%; } .search { width: 100%; } .filterbar .lbl { display: none; } }
+
+  /* ---------- seções ---------- */
+  section.block { margin-top: 48px; }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .sec-head h2 { margin: 0; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; }
+  .sec-head h2 small { font-family: Inter, system-ui, sans-serif; font-size: 13px; font-weight: 500; color: var(--text-3); text-transform: none; letter-spacing: 0; margin-left: 10px; }
+  .sec-head .note { font-size: 13px; color: var(--text-3); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); }
+
+  /* ---------- pódio ---------- */
+  .podium { display: grid; grid-template-columns: 1fr 1.12fr 1fr; gap: 16px; align-items: end; }
+  .pod { position: relative; overflow: hidden; padding: 22px 22px 20px; --medal: var(--silver); }
+  .pod.p1 { --medal: var(--gold); padding-top: 30px; padding-bottom: 26px; }
+  .pod.p3 { --medal: var(--bronze); }
+  .pod::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--medal);
+  }
+  .pod::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(420px 200px at 100% 0%, color-mix(in srgb, var(--medal) 14%, transparent), transparent 70%);
+  }
+  .pod .ghost {
+    position: absolute; right: -6px; top: -26px; font-size: 180px; font-weight: 800; line-height: 1;
+    color: color-mix(in srgb, var(--medal) 10%, transparent); pointer-events: none; user-select: none;
+  }
+  .pod.p1 .ghost { font-size: 220px; top: -36px; }
+  .pod .place { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--medal); }
+  .pod .who { position: relative; display: flex; align-items: center; gap: 14px; margin: 16px 0 18px; }
+  .avatar {
+    flex: none; width: 44px; height: 44px; border-radius: 12px;
+    display: grid; place-items: center; font-weight: 700; font-size: 15px;
+    background: var(--surface-3); color: var(--text-2);
+  }
+  .pod .avatar { width: 52px; height: 52px; font-size: 18px; border-radius: 14px; background: color-mix(in srgb, var(--medal) 18%, var(--surface-2)); color: var(--medal); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--medal) 40%, transparent); }
+  .pod.p1 .avatar { width: 60px; height: 60px; font-size: 21px; }
+  .pod .pname { font-size: 22px; font-weight: 700; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pod.p1 .pname { font-size: 26px; }
+  .pod .pmeta { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+  .pod .score { position: relative; display: flex; align-items: baseline; gap: 8px; }
+  .pod .score .v { font-size: 60px; font-weight: 800; line-height: 0.9; }
+  .pod.p1 .score .v { font-size: 76px; }
+  .pod .score .l { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .pod .stats { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .pod .stats .l { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .pod .stats .v { font-size: 17px; font-weight: 600; margin-top: 3px; }
+  @media (max-width: 860px) {
+    .podium { grid-template-columns: 1fr; }
+    .pod.p1 { order: -1; }
+  }
+
+  /* ---------- destaques ---------- */
+  .awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+  .award { display: flex; gap: 14px; align-items: center; padding: 16px 18px; }
+  .award .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent); flex: none; }
+  .award .ic svg.i { width: 20px; height: 20px; }
+  .award .body { min-width: 0; flex: 1; }
+  .award .l { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .award .pname { font-size: 16px; font-weight: 700; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .award .hint { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .award .v { font-size: 34px; font-weight: 700; line-height: 1; }
+
+  /* ---------- scatter ---------- */
+  .chart-card { padding: 18px 18px 10px; }
+  .chart-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); margin: 0 4px 8px; }
+  .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-legend .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-mark); }
+  .chart-legend .sw.lg { width: 16px; height: 16px; }
+  .chart-legend .dash { width: 18px; border-top: 1.5px dashed var(--baseline); }
+  #scatter { position: relative; }
+  #scatter svg { display: block; width: 100%; overflow: visible; }
+  #scatter .tick { font-size: 11px; fill: var(--text-3); font-variant-numeric: tabular-nums; }
+  #scatter .axis-title { font-size: 11px; font-weight: 600; fill: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; }
+  #scatter .quad { font-size: 11px; font-weight: 600; fill: var(--text-3); opacity: 0.8; letter-spacing: 0.06em; text-transform: uppercase; }
+  #scatter .lbl { font-size: 11.5px; font-weight: 600; fill: var(--text-2); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+  #scatter circle.pt { fill: var(--accent-mark); fill-opacity: 0.82; stroke: var(--surface); stroke-width: 2; transition: fill-opacity .15s; }
+  #scatter circle.pt.dim { fill-opacity: 0.18; }
+  #scatter circle.pt.hl { fill-opacity: 1; stroke: var(--text); }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 5; min-width: 170px;
+    background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s;
+  }
+  .tooltip.on { opacity: 1; transform: none; }
+  .tooltip .t { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+  .tooltip .r { display: flex; justify-content: space-between; gap: 16px; color: var(--text-2); padding: 1px 0; }
+  .tooltip .r b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- tabela ---------- */
+  .table-card { overflow: hidden; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    position: relative; text-align: right; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-3); padding: 12px 10px; border-bottom: 1px solid var(--border);
+    white-space: nowrap; user-select: none; background: var(--surface-2);
+  }
+  thead th button { font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  thead th button:hover, thead th[aria-sort] button { color: var(--text); }
+  thead th .arrow { color: var(--accent); font-size: 9px; }
+  th.left, td.left { text-align: left; }
+  tbody tr.row { cursor: pointer; }
+  tbody tr.row td { padding: 12px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  tbody tr.row td.left { text-align: left; }
+  tbody tr.row:hover td { background: var(--accent-wash); }
+  tbody tr.row.open td { background: var(--accent-wash); border-bottom-color: transparent; }
+  td.rank { width: 48px; font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-size: 20px; font-weight: 700; color: var(--text-3) !important; }
+  tr.r1 td.rank { color: var(--gold) !important; }
+  tr.r2 td.rank { color: var(--silver) !important; }
+  tr.r3 td.rank { color: var(--bronze) !important; }
+  .pcell { display: flex; align-items: center; gap: 12px; }
+  .pcell .avatar { width: 34px; height: 34px; font-size: 12px; border-radius: 10px; }
+  .pcell .pname { font-weight: 600; color: var(--text); }
+  .pcell .pmeta { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+  .tier {
+    display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px;
+    font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-weight: 800; font-size: 14px;
+    border: 1px solid var(--border-strong); color: var(--text-2);
+  }
+  .tier.S { background: var(--accent); color: #17120a; border-color: transparent; }
+  .tier.A { background: var(--accent-wash); color: var(--accent); border-color: var(--accent-glow); }
+  .scorecell { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+  .bar { width: 80px; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent-mark); border-radius: 3px; }
+  .scorecell b { color: var(--text); font-weight: 700; min-width: 38px; font-size: 15px; }
+  td.strong { color: var(--text) !important; font-weight: 600; }
+  .sub { color: var(--text-3); font-size: 12px; margin-left: 4px; font-weight: 400; }
+  .kd { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+  .kd.up { color: var(--good); }
+  .kd.down { color: var(--bad); }
+  .kd .tri { font-size: 8px; }
+  .chev { color: var(--text-3); width: 28px; }
+  .chev svg.i { width: 16px; height: 16px; transition: transform .2s; }
+  tr.open .chev svg.i { transform: rotate(180deg); }
+  tr.detail td { padding: 0 !important; border-bottom: 1px solid var(--border); background: var(--accent-wash); }
+  .detail-inner { padding: 4px 16px 18px 70px; display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
+  .dstats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
+  .dstat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+  .dstat .l { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .dstat .v { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .hist { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: auto; max-height: 300px; }
+  .hist table td, .hist table th { padding: 7px 10px; font-size: 12.5px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: right; color: var(--text-2); }
+  .hist table th { background: var(--surface-2); font-size: 10px; position: sticky; top: 0; }
+  .hist table tr:last-child td { border-bottom: 0; }
+  .hist table td.left, .hist table th.left { text-align: left; }
+  .res { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 5px; font-size: 11px; font-weight: 700; }
+  .res.w { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .res.l { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+  .empty { padding: 40px; text-align: center; color: var(--text-3); }
+  @media (max-width: 760px) {
+    th.sticky, td.sticky { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+    thead th.sticky { background: var(--surface-2); }
+    .detail-inner { grid-template-columns: 1fr; padding-left: 16px; }
+    td.rank, th.rankh { display: none; }
+  }
+
+  /* ---------- mapas ---------- */
+  .maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(270px, 100%), 1fr)); gap: 14px; }
+  .map { overflow: hidden; --mc: var(--accent-mark); }
+  .map .mh {
+    position: relative; padding: 16px 16px 14px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--mc) 34%, transparent), transparent 75%);
+    border-bottom: 1px solid var(--border);
+  }
+  .map .mh::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .6;
+    background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--mc) 14%, transparent) 0 1px, transparent 1px 9px);
+    mask-image: linear-gradient(90deg, transparent 40%, black); -webkit-mask-image: linear-gradient(90deg, transparent 40%, black);
+  }
+  .map .mname { position: relative; font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1; }
+  .map .mdate { position: relative; font-size: 12px; color: var(--text-2); margin-top: 4px; }
+  .map .mb { padding: 12px 16px 14px; }
+  .team { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 6px 0 6px 10px; border-left: 3px solid transparent; }
+  .team .tn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 13.5px; }
+  .team .ts { font-size: 28px; font-weight: 700; line-height: 1; color: var(--text-3); }
+  .team.win { border-left-color: var(--accent); }
+  .team.win .tn { color: var(--text); font-weight: 600; }
+  .team.win .ts { color: var(--text); }
+  .team .wtag { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-left: 6px; }
+  .map .mvp { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-strong); font-size: 12px; color: var(--text-3); }
+  .map .mvp svg.i { width: 14px; height: 14px; color: var(--accent); }
+  .map .mvp b { color: var(--text); font-weight: 600; }
+
+  footer { margin: 56px 0 48px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 12px; line-height: 1.7; }
+  footer b { color: var(--text-2); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-top">
+      <div class="brand"><span class="dot"></span>MatchZy · CS2 · Mix</div>
+      <button class="theme-btn" id="theme-btn" type="button">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        Tema
+      </button>
+    </div>
+    <h1 class="display">Ranking <span class="accent">do Mix</span></h1>
+    <p class="hero-sub" id="hero-sub"></p>
+    <div class="kpis" id="kpis"></div>
+  </div>
+</header>
+
+<div class="filterbar">
+  <div class="wrap">
+    <span class="lbl">Mostrar quem jogou</span>
+    <div class="seg" id="seg" role="group" aria-label="Mínimo de mapas"></div>
+    <div class="search-wrap">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input class="search" id="search" type="search" placeholder="Buscar jogador" aria-label="Buscar jogador" />
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="block">
+    <div class="sec-head"><h2 class="display">Pódio</h2><span class="note" id="podium-note"></span></div>
+    <div class="podium" id="podium"></div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><h2 class="display">Destaques</h2></div>
+    <div class="awards" id="awards"></div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <h2 class="display">Dano × K/D <small>cada ponto é um jogador · passe o mouse</small></h2>
+    </div>
+    <div class="card chart-card">
+      <div class="chart-legend">
+        <span><i class="sw"></i><i class="sw lg"></i> tamanho = mapas jogados</span>
+        <span><i class="dash"></i> K/D 1,0 e ADR mediano</span>
+      </div>
+      <div id="scatter"><div class="tooltip" id="tip"></div></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <h2 class="display">Classificação <small id="count"></small></h2>
+      <span class="note">clique num jogador pra ver o histórico</span>
+    </div>
+    <div class="card table-card">
+      <div class="table-scroll">
+        <table>
+          <thead><tr id="thead-row"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head"><h2 class="display">Mapas jogados <small id="maps-count"></small></h2></div>
+    <div class="maps" id="maps"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</main>
+
+<script>
+const PAYLOAD = {"players": [{"name": "RUANZA1", "steamid64": "76561198129002773", "matches": 4, "maps": 4, "rounds": 84, "kills": 86, "deaths": 53, "assists": 16, "damage": 8587, "kd": 1.62, "kpr": 1.02, "adr": 102.2, "hs_pct": 58.1, "multi_kills": 24, "clutch_won": 4, "clutch_att": 9, "clutch_pct": 44.4, "wins": 2, "losses": 2, "win_pct": 50.0, "k3": 6, "k4": 2, "aces": 1, "history": [{"date": "2026-09-11 02:12", "map": "Inferno", "won": false, "score": 10, "opp": 13, "kills": 32, "deaths": 15, "assists": 4, "adr": 127.5, "hs_pct": 69}, {"date": "2026-09-11 01:33", "map": "Cache", "won": false, "score": 7, "opp": 13, "kills": 16, "deaths": 14, "assists": 4, "adr": 101.7, "hs_pct": 56}, {"date": "2026-09-11 00:59", "map": "Mirage", "won": true, "score": 13, "opp": 5, "kills": 14, "deaths": 10, "assists": 4, "adr": 75.2, "hs_pct": 43}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": true, "score": 13, "opp": 10, "kills": 24, "deaths": 14, "assists": 4, "adr": 98.6, "hs_pct": 54}], "rating": 81.97, "rank": 1}, {"name": "h$collection", "steamid64": "76561198132897300", "matches": 19, "maps": 19, "rounds": 392, "kills": 388, "deaths": 238, "assists": 81, "damage": 37498, "kd": 1.63, "kpr": 0.99, "adr": 95.7, "hs_pct": 47.9, "multi_kills": 110, "clutch_won": 16, "clutch_att": 29, "clutch_pct": 55.2, "wins": 12, "losses": 7, "win_pct": 63.2, "k3": 28, "k4": 11, "aces": 1, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": false, "score": 11, "opp": 13, "kills": 22, "deaths": 18, "assists": 4, "adr": 109.1, "hs_pct": 77}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": true, "score": 13, "opp": 5, "kills": 10, "deaths": 14, "assists": 10, "adr": 74.4, "hs_pct": 40}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 23, "deaths": 16, "assists": 7, "adr": 96.9, "hs_pct": 30}, {"date": "2026-09-27 02:32", "map": "Train", "won": false, "score": 4, "opp": 13, "kills": 15, "deaths": 14, "assists": 2, "adr": 83.3, "hs_pct": 40}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": true, "score": 13, "opp": 3, "kills": 16, "deaths": 5, "assists": 2, "adr": 95.2, "hs_pct": 62}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": true, "score": 13, "opp": 7, "kills": 14, "deaths": 12, "assists": 4, "adr": 64.8, "hs_pct": 29}, {"date": "2026-09-27 00:32", "map": "Cache", "won": false, "score": 10, "opp": 13, "kills": 20, "deaths": 16, "assists": 7, "adr": 101.9, "hs_pct": 25}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": true, "score": 13, "opp": 6, "kills": 37, "deaths": 6, "assists": 4, "adr": 170.2, "hs_pct": 51}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 24, "deaths": 11, "assists": 2, "adr": 77.0, "hs_pct": 29}, {"date": "2026-09-26 04:22", "map": "Ancient", "won": false, "score": 11, "opp": 13, "kills": 19, "deaths": 15, "assists": 4, "adr": 77.8, "hs_pct": 63}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 29, "deaths": 17, "assists": 3, "adr": 125.0, "hs_pct": 69}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": false, "score": 14, "opp": 16, "kills": 25, "deaths": 22, "assists": 3, "adr": 78.2, "hs_pct": 60}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 17, "deaths": 10, "assists": 3, "adr": 57.6, "hs_pct": 18}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": true, "score": 13, "opp": 6, "kills": 18, "deaths": 13, "assists": 6, "adr": 108.2, "hs_pct": 56}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": true, "score": 13, "opp": 4, "kills": 23, "deaths": 8, "assists": 6, "adr": 124.0, "hs_pct": 52}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": true, "score": 13, "opp": 7, "kills": 23, "deaths": 9, "assists": 2, "adr": 106.9, "hs_pct": 39}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": false, "score": 9, "opp": 13, "kills": 16, "deaths": 16, "assists": 2, "adr": 76.5, "hs_pct": 44}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 17, "deaths": 10, "assists": 5, "adr": 82.8, "hs_pct": 47}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": true, "score": 13, "opp": 2, "kills": 20, "deaths": 6, "assists": 5, "adr": 130.5, "hs_pct": 55}], "rating": 79.57, "rank": 2}, {"name": "visc4rd", "steamid64": "76561198084609467", "matches": 7, "maps": 7, "rounds": 159, "kills": 154, "deaths": 103, "assists": 31, "damage": 15675, "kd": 1.5, "kpr": 0.97, "adr": 98.6, "hs_pct": 44.8, "multi_kills": 40, "clutch_won": 8, "clutch_att": 13, "clutch_pct": 61.5, "wins": 5, "losses": 2, "win_pct": 71.4, "k3": 8, "k4": 3, "aces": 1, "history": [{"date": "2026-09-28 23:50", "map": "Cache", "won": false, "score": 20, "opp": 22, "kills": 29, "deaths": 35, "assists": 11, "adr": 91.3, "hs_pct": 55}, {"date": "2026-09-27 02:32", "map": "Train", "won": true, "score": 13, "opp": 4, "kills": 22, "deaths": 9, "assists": 5, "adr": 130.5, "hs_pct": 45}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": true, "score": 13, "opp": 3, "kills": 18, "deaths": 7, "assists": 3, "adr": 95.9, "hs_pct": 33}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": true, "score": 13, "opp": 7, "kills": 27, "deaths": 11, "assists": 3, "adr": 128.3, "hs_pct": 33}, {"date": "2026-09-27 00:32", "map": "Cache", "won": true, "score": 13, "opp": 10, "kills": 29, "deaths": 14, "assists": 2, "adr": 114.9, "hs_pct": 45}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": true, "score": 13, "opp": 6, "kills": 13, "deaths": 12, "assists": 4, "adr": 66.4, "hs_pct": 54}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 16, "deaths": 15, "assists": 3, "adr": 73.5, "hs_pct": 50}], "rating": 79.26, "rank": 3}, {"name": "trojan", "steamid64": "76561198135425185", "matches": 14, "maps": 14, "rounds": 315, "kills": 311, "deaths": 212, "assists": 68, "damage": 32207, "kd": 1.47, "kpr": 0.99, "adr": 102.2, "hs_pct": 46.3, "multi_kills": 91, "clutch_won": 7, "clutch_att": 24, "clutch_pct": 29.2, "wins": 9, "losses": 5, "win_pct": 64.3, "k3": 26, "k4": 4, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": false, "score": 11, "opp": 13, "kills": 28, "deaths": 19, "assists": 2, "adr": 108.7, "hs_pct": 43}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": true, "score": 13, "opp": 5, "kills": 22, "deaths": 10, "assists": 6, "adr": 122.3, "hs_pct": 45}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 23, "deaths": 16, "assists": 4, "adr": 98.6, "hs_pct": 52}, {"date": "2026-09-27 02:32", "map": "Train", "won": true, "score": 13, "opp": 4, "kills": 11, "deaths": 9, "assists": 3, "adr": 68.8, "hs_pct": 27}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": true, "score": 13, "opp": 3, "kills": 15, "deaths": 6, "assists": 3, "adr": 103.1, "hs_pct": 20}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": false, "score": 7, "opp": 13, "kills": 19, "deaths": 16, "assists": 9, "adr": 109.7, "hs_pct": 63}, {"date": "2026-09-26 04:22", "map": "Ancient", "won": false, "score": 11, "opp": 13, "kills": 22, "deaths": 16, "assists": 6, "adr": 99.3, "hs_pct": 45}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 18, "deaths": 15, "assists": 5, "adr": 99.0, "hs_pct": 39}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": false, "score": 14, "opp": 16, "kills": 30, "deaths": 21, "assists": 4, "adr": 104.1, "hs_pct": 43}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 24, "deaths": 13, "assists": 5, "adr": 112.1, "hs_pct": 46}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": false, "score": 6, "opp": 13, "kills": 22, "deaths": 14, "assists": 5, "adr": 125.1, "hs_pct": 59}, {"date": "2026-09-12 01:57", "map": "Cache", "won": true, "score": 13, "opp": 9, "kills": 21, "deaths": 15, "assists": 3, "adr": 81.6, "hs_pct": 43}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 21, "deaths": 17, "assists": 3, "adr": 96.8, "hs_pct": 81}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": true, "score": 19, "opp": 16, "kills": 35, "deaths": 25, "assists": 10, "adr": 102.7, "hs_pct": 34}], "rating": 77.62, "rank": 4}, {"name": "zdR", "steamid64": "76561198064438523", "matches": 11, "maps": 11, "rounds": 241, "kills": 231, "deaths": 173, "assists": 50, "damage": 23784, "kd": 1.34, "kpr": 0.96, "adr": 98.7, "hs_pct": 56.7, "multi_kills": 64, "clutch_won": 5, "clutch_att": 20, "clutch_pct": 25.0, "wins": 6, "losses": 5, "win_pct": 54.5, "k3": 18, "k4": 6, "aces": 1, "history": [{"date": "2026-09-26 04:22", "map": "Ancient", "won": true, "score": 13, "opp": 11, "kills": 19, "deaths": 19, "assists": 3, "adr": 91.7, "hs_pct": 68}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 29, "deaths": 15, "assists": 5, "adr": 131.6, "hs_pct": 69}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": true, "score": 16, "opp": 14, "kills": 24, "deaths": 17, "assists": 6, "adr": 89.2, "hs_pct": 46}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 24, "deaths": 18, "assists": 10, "adr": 120.8, "hs_pct": 54}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": true, "score": 13, "opp": 6, "kills": 20, "deaths": 14, "assists": 6, "adr": 112.3, "hs_pct": 50}, {"date": "2026-09-25 01:25", "map": "Cache", "won": false, "score": 8, "opp": 13, "kills": 24, "deaths": 15, "assists": 2, "adr": 109.2, "hs_pct": 58}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 17, "deaths": 13, "assists": 5, "adr": 94.8, "hs_pct": 53}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": false, "score": 2, "opp": 13, "kills": 9, "deaths": 14, "assists": 1, "adr": 55.8, "hs_pct": 56}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": true, "score": 13, "opp": 11, "kills": 19, "deaths": 17, "assists": 6, "adr": 87.1, "hs_pct": 53}, {"date": "2026-09-12 01:57", "map": "Cache", "won": true, "score": 13, "opp": 9, "kills": 19, "deaths": 14, "assists": 3, "adr": 86.5, "hs_pct": 63}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 27, "deaths": 17, "assists": 3, "adr": 101.8, "hs_pct": 52}], "rating": 75.02, "rank": 5}, {"name": "nK1 ★", "steamid64": "76561198142003739", "matches": 9, "maps": 9, "rounds": 232, "kills": 214, "deaths": 161, "assists": 47, "damage": 23063, "kd": 1.33, "kpr": 0.92, "adr": 99.4, "hs_pct": 46.7, "multi_kills": 62, "clutch_won": 9, "clutch_att": 23, "clutch_pct": 39.1, "wins": 5, "losses": 4, "win_pct": 55.6, "k3": 17, "k4": 2, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": true, "score": 13, "opp": 11, "kills": 26, "deaths": 18, "assists": 6, "adr": 124.1, "hs_pct": 31}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": true, "score": 13, "opp": 5, "kills": 24, "deaths": 11, "assists": 4, "adr": 129.2, "hs_pct": 58}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 15, "deaths": 16, "assists": 4, "adr": 78.3, "hs_pct": 40}, {"date": "2026-09-28 23:50", "map": "Cache", "won": true, "score": 22, "opp": 20, "kills": 43, "deaths": 29, "assists": 5, "adr": 95.9, "hs_pct": 51}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": false, "score": 9, "opp": 13, "kills": 10, "deaths": 16, "assists": 8, "adr": 77.1, "hs_pct": 50}, {"date": "2026-09-25 01:25", "map": "Cache", "won": true, "score": 13, "opp": 8, "kills": 25, "deaths": 15, "assists": 5, "adr": 124.5, "hs_pct": 48}, {"date": "2026-09-12 01:57", "map": "Cache", "won": false, "score": 9, "opp": 13, "kills": 18, "deaths": 15, "assists": 2, "adr": 78.6, "hs_pct": 61}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 22, "deaths": 17, "assists": 7, "adr": 95.1, "hs_pct": 45}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": false, "score": 16, "opp": 19, "kills": 31, "deaths": 24, "assists": 6, "adr": 100.9, "hs_pct": 39}], "rating": 74.64, "rank": 6}, {"name": "AdvanceD 316", "steamid64": "76561197993281524", "matches": 1, "maps": 1, "rounds": 24, "kills": 20, "deaths": 18, "assists": 7, "damage": 2387, "kd": 1.11, "kpr": 0.83, "adr": 99.5, "hs_pct": 60.0, "multi_kills": 5, "clutch_won": 1, "clutch_att": 2, "clutch_pct": 50.0, "wins": 0, "losses": 1, "win_pct": 0.0, "k3": 2, "k4": 0, "aces": 0, "history": [{"date": "2026-09-12 02:45", "map": "Inferno", "won": false, "score": 11, "opp": 13, "kills": 20, "deaths": 18, "assists": 7, "adr": 99.5, "hs_pct": 60}], "rating": 71.75, "rank": 7}, {"name": "TzN-", "steamid64": "76561198029423923", "matches": 1, "maps": 1, "rounds": 23, "kills": 20, "deaths": 14, "assists": 6, "damage": 2395, "kd": 1.43, "kpr": 0.87, "adr": 104.1, "hs_pct": 50.0, "multi_kills": 5, "clutch_won": 0, "clutch_att": 4, "clutch_pct": 0.0, "wins": 0, "losses": 1, "win_pct": 0.0, "k3": 2, "k4": 0, "aces": 0, "history": [{"date": "2026-09-11 00:15", "map": "Dust2", "won": false, "score": 10, "opp": 13, "kills": 20, "deaths": 14, "assists": 6, "adr": 104.1, "hs_pct": 50}], "rating": 70.46, "rank": 8}, {"name": "sirhardneja", "steamid64": "76561197992801682", "matches": 2, "maps": 2, "rounds": 41, "kills": 37, "deaths": 36, "assists": 12, "damage": 4150, "kd": 1.03, "kpr": 0.9, "adr": 101.2, "hs_pct": 59.5, "multi_kills": 11, "clutch_won": 0, "clutch_att": 1, "clutch_pct": 0.0, "wins": 0, "losses": 2, "win_pct": 0.0, "k3": 1, "k4": 2, "aces": 0, "history": [{"date": "2026-09-11 00:59", "map": "Mirage", "won": false, "score": 5, "opp": 13, "kills": 10, "deaths": 16, "assists": 6, "adr": 67.7, "hs_pct": 50}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": false, "score": 10, "opp": 13, "kills": 27, "deaths": 20, "assists": 6, "adr": 127.4, "hs_pct": 63}], "rating": 69.51, "rank": 9}, {"name": "Alek1Ng", "steamid64": "76561199062685159", "matches": 6, "maps": 6, "rounds": 143, "kills": 128, "deaths": 91, "assists": 41, "damage": 13014, "kd": 1.41, "kpr": 0.9, "adr": 91.0, "hs_pct": 51.6, "multi_kills": 33, "clutch_won": 0, "clutch_att": 6, "clutch_pct": 0.0, "wins": 5, "losses": 1, "win_pct": 83.3, "k3": 10, "k4": 2, "aces": 0, "history": [{"date": "2026-09-12 00:49", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 26, "deaths": 15, "assists": 5, "adr": 92.6, "hs_pct": 42}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": true, "score": 19, "opp": 16, "kills": 27, "deaths": 22, "assists": 16, "adr": 91.5, "hs_pct": 56}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": true, "score": 13, "opp": 10, "kills": 24, "deaths": 15, "assists": 6, "adr": 96.2, "hs_pct": 46}, {"date": "2026-09-11 01:33", "map": "Cache", "won": true, "score": 13, "opp": 7, "kills": 19, "deaths": 13, "assists": 2, "adr": 90.0, "hs_pct": 53}, {"date": "2026-09-11 00:59", "map": "Mirage", "won": true, "score": 13, "opp": 5, "kills": 22, "deaths": 7, "assists": 7, "adr": 133.0, "hs_pct": 55}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": false, "score": 10, "opp": 13, "kills": 10, "deaths": 19, "assists": 5, "adr": 51.3, "hs_pct": 70}], "rating": 68.17, "rank": 10}, {"name": "Hugod", "steamid64": "76561198384151039", "matches": 2, "maps": 2, "rounds": 59, "kills": 51, "deaths": 44, "assists": 15, "damage": 5390, "kd": 1.16, "kpr": 0.86, "adr": 91.4, "hs_pct": 54.9, "multi_kills": 11, "clutch_won": 1, "clutch_att": 5, "clutch_pct": 20.0, "wins": 1, "losses": 1, "win_pct": 50.0, "k3": 1, "k4": 1, "aces": 0, "history": [{"date": "2026-09-12 00:49", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 19, "deaths": 22, "assists": 5, "adr": 99.1, "hs_pct": 63}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": true, "score": 19, "opp": 16, "kills": 32, "deaths": 22, "assists": 10, "adr": 86.1, "hs_pct": 50}], "rating": 67.96, "rank": 11}, {"name": "MX", "steamid64": "76561198129832144", "matches": 16, "maps": 16, "rounds": 374, "kills": 314, "deaths": 275, "assists": 78, "damage": 32016, "kd": 1.14, "kpr": 0.84, "adr": 85.6, "hs_pct": 44.6, "multi_kills": 80, "clutch_won": 12, "clutch_att": 28, "clutch_pct": 42.9, "wins": 7, "losses": 9, "win_pct": 43.8, "k3": 22, "k4": 7, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": true, "score": 13, "opp": 11, "kills": 17, "deaths": 19, "assists": 8, "adr": 75.4, "hs_pct": 41}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": false, "score": 5, "opp": 13, "kills": 18, "deaths": 16, "assists": 5, "adr": 93.8, "hs_pct": 78}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 16, "deaths": 15, "assists": 6, "adr": 76.8, "hs_pct": 62}, {"date": "2026-09-28 23:50", "map": "Cache", "won": false, "score": 20, "opp": 22, "kills": 46, "deaths": 28, "assists": 8, "adr": 89.1, "hs_pct": 35}, {"date": "2026-09-26 04:22", "map": "Ancient", "won": true, "score": 13, "opp": 11, "kills": 16, "deaths": 16, "assists": 0, "adr": 70.9, "hs_pct": 62}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 22, "deaths": 16, "assists": 3, "adr": 90.9, "hs_pct": 45}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": false, "score": 4, "opp": 13, "kills": 11, "deaths": 16, "assists": 2, "adr": 82.4, "hs_pct": 55}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": false, "score": 7, "opp": 13, "kills": 13, "deaths": 16, "assists": 4, "adr": 82.1, "hs_pct": 77}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": true, "score": 13, "opp": 9, "kills": 25, "deaths": 14, "assists": 3, "adr": 110.1, "hs_pct": 40}, {"date": "2026-09-25 01:25", "map": "Cache", "won": true, "score": 13, "opp": 8, "kills": 23, "deaths": 13, "assists": 5, "adr": 103.4, "hs_pct": 43}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 20, "deaths": 12, "assists": 3, "adr": 84.7, "hs_pct": 15}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": false, "score": 2, "opp": 13, "kills": 5, "deaths": 15, "assists": 1, "adr": 48.5, "hs_pct": 60}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": true, "score": 13, "opp": 11, "kills": 21, "deaths": 18, "assists": 11, "adr": 99.7, "hs_pct": 43}, {"date": "2026-09-12 01:57", "map": "Cache", "won": false, "score": 9, "opp": 13, "kills": 23, "deaths": 14, "assists": 5, "adr": 121.7, "hs_pct": 43}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 16, "deaths": 17, "assists": 3, "adr": 58.2, "hs_pct": 25}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": false, "score": 16, "opp": 19, "kills": 22, "deaths": 30, "assists": 11, "adr": 77.3, "hs_pct": 36}], "rating": 67.21, "rank": 12}, {"name": "TsSx:*", "steamid64": "76561198261007919", "matches": 3, "maps": 3, "rounds": 58, "kills": 50, "deaths": 39, "assists": 9, "damage": 5244, "kd": 1.28, "kpr": 0.86, "adr": 90.4, "hs_pct": 44.0, "multi_kills": 15, "clutch_won": 0, "clutch_att": 2, "clutch_pct": 0.0, "wins": 1, "losses": 2, "win_pct": 33.3, "k3": 2, "k4": 0, "aces": 0, "history": [{"date": "2026-09-27 00:32", "map": "Cache", "won": false, "score": 10, "opp": 13, "kills": 12, "deaths": 19, "assists": 2, "adr": 63.9, "hs_pct": 42}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 17, "deaths": 15, "assists": 3, "adr": 88.1, "hs_pct": 59}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": true, "score": 13, "opp": 2, "kills": 21, "deaths": 5, "assists": 4, "adr": 134.2, "hs_pct": 33}], "rating": 65.7, "rank": 13}, {"name": "bAndi1337", "steamid64": "76561197976966834", "matches": 4, "maps": 4, "rounds": 76, "kills": 60, "deaths": 48, "assists": 17, "damage": 6995, "kd": 1.25, "kpr": 0.79, "adr": 92.0, "hs_pct": 40.0, "multi_kills": 17, "clutch_won": 0, "clutch_att": 2, "clutch_pct": 0.0, "wins": 4, "losses": 0, "win_pct": 100.0, "k3": 1, "k4": 0, "aces": 0, "history": [{"date": "2026-09-27 02:32", "map": "Train", "won": true, "score": 13, "opp": 4, "kills": 12, "deaths": 11, "assists": 3, "adr": 70.2, "hs_pct": 67}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": true, "score": 13, "opp": 3, "kills": 17, "deaths": 7, "assists": 3, "adr": 120.5, "hs_pct": 29}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": true, "score": 13, "opp": 7, "kills": 21, "deaths": 14, "assists": 6, "adr": 113.8, "hs_pct": 29}, {"date": "2026-09-27 00:32", "map": "Cache", "won": true, "score": 13, "opp": 10, "kills": 10, "deaths": 16, "assists": 5, "adr": 69.4, "hs_pct": 50}], "rating": 62.84, "rank": 14}, {"name": "♔ Flex", "steamid64": "76561198238508032", "matches": 13, "maps": 13, "rounds": 272, "kills": 199, "deaths": 198, "assists": 54, "damage": 22672, "kd": 1.01, "kpr": 0.73, "adr": 83.4, "hs_pct": 37.7, "multi_kills": 51, "clutch_won": 4, "clutch_att": 16, "clutch_pct": 25.0, "wins": 8, "losses": 5, "win_pct": 61.5, "k3": 13, "k4": 2, "aces": 1, "history": [{"date": "2026-09-27 02:32", "map": "Train", "won": false, "score": 4, "opp": 13, "kills": 5, "deaths": 15, "assists": 3, "adr": 40.7, "hs_pct": 40}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": false, "score": 3, "opp": 13, "kills": 6, "deaths": 16, "assists": 2, "adr": 57.1, "hs_pct": 50}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": false, "score": 7, "opp": 13, "kills": 18, "deaths": 17, "assists": 3, "adr": 93.7, "hs_pct": 44}, {"date": "2026-09-27 00:32", "map": "Cache", "won": true, "score": 13, "opp": 10, "kills": 15, "deaths": 15, "assists": 3, "adr": 78.3, "hs_pct": 33}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": false, "score": 6, "opp": 13, "kills": 12, "deaths": 16, "assists": 5, "adr": 73.8, "hs_pct": 33}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 25, "deaths": 14, "assists": 6, "adr": 126.9, "hs_pct": 32}, {"date": "2026-09-26 04:22", "map": "Ancient", "won": true, "score": 13, "opp": 11, "kills": 17, "deaths": 17, "assists": 7, "adr": 85.2, "hs_pct": 35}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 19, "deaths": 16, "assists": 4, "adr": 89.5, "hs_pct": 26}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": true, "score": 16, "opp": 14, "kills": 23, "deaths": 19, "assists": 4, "adr": 78.9, "hs_pct": 43}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 13, "deaths": 16, "assists": 5, "adr": 82.2, "hs_pct": 62}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": true, "score": 13, "opp": 4, "kills": 10, "deaths": 11, "assists": 3, "adr": 62.9, "hs_pct": 20}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": true, "score": 13, "opp": 7, "kills": 19, "deaths": 12, "assists": 4, "adr": 95.7, "hs_pct": 26}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": true, "score": 13, "opp": 9, "kills": 17, "deaths": 14, "assists": 5, "adr": 99.5, "hs_pct": 53}], "rating": 59.51, "rank": 15}, {"name": "Wise", "steamid64": "76561198013581423", "matches": 8, "maps": 8, "rounds": 203, "kills": 144, "deaths": 159, "assists": 43, "damage": 15820, "kd": 0.91, "kpr": 0.71, "adr": 77.9, "hs_pct": 54.9, "multi_kills": 32, "clutch_won": 4, "clutch_att": 11, "clutch_pct": 36.4, "wins": 5, "losses": 3, "win_pct": 62.5, "k3": 5, "k4": 3, "aces": 0, "history": [{"date": "2026-09-28 23:50", "map": "Cache", "won": true, "score": 22, "opp": 20, "kills": 39, "deaths": 31, "assists": 6, "adr": 90.6, "hs_pct": 56}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": false, "score": 7, "opp": 13, "kills": 8, "deaths": 18, "assists": 2, "adr": 48.5, "hs_pct": 75}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 15, "deaths": 19, "assists": 4, "adr": 68.6, "hs_pct": 47}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": false, "score": 16, "opp": 19, "kills": 19, "deaths": 29, "assists": 6, "adr": 57.4, "hs_pct": 53}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": true, "score": 13, "opp": 10, "kills": 18, "deaths": 19, "assists": 8, "adr": 96.8, "hs_pct": 67}, {"date": "2026-09-11 01:33", "map": "Cache", "won": true, "score": 13, "opp": 7, "kills": 22, "deaths": 12, "assists": 2, "adr": 107.9, "hs_pct": 59}, {"date": "2026-09-11 00:59", "map": "Mirage", "won": true, "score": 13, "opp": 5, "kills": 11, "deaths": 12, "assists": 7, "adr": 83.0, "hs_pct": 27}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": true, "score": 13, "opp": 10, "kills": 12, "deaths": 19, "assists": 8, "adr": 71.7, "hs_pct": 50}], "rating": 58.76, "rank": 16}, {"name": "unkah", "steamid64": "76561198827764628", "matches": 11, "maps": 11, "rounds": 212, "kills": 142, "deaths": 138, "assists": 53, "damage": 15792, "kd": 1.03, "kpr": 0.67, "adr": 74.5, "hs_pct": 47.2, "multi_kills": 40, "clutch_won": 7, "clutch_att": 14, "clutch_pct": 50.0, "wins": 8, "losses": 3, "win_pct": 72.7, "k3": 12, "k4": 0, "aces": 0, "history": [{"date": "2026-09-27 02:32", "map": "Train", "won": false, "score": 4, "opp": 13, "kills": 8, "deaths": 14, "assists": 6, "adr": 74.2, "hs_pct": 50}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": false, "score": 3, "opp": 13, "kills": 10, "deaths": 14, "assists": 1, "adr": 57.0, "hs_pct": 50}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 13, "deaths": 17, "assists": 7, "adr": 87.8, "hs_pct": 69}, {"date": "2026-09-26 04:22", "map": "Ancient", "won": true, "score": 13, "opp": 11, "kills": 13, "deaths": 15, "assists": 4, "adr": 64.3, "hs_pct": 62}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 14, "deaths": 15, "assists": 3, "adr": 62.0, "hs_pct": 50}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": true, "score": 13, "opp": 6, "kills": 19, "deaths": 13, "assists": 4, "adr": 96.7, "hs_pct": 47}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": true, "score": 13, "opp": 4, "kills": 16, "deaths": 6, "assists": 9, "adr": 102.4, "hs_pct": 50}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": true, "score": 13, "opp": 7, "kills": 11, "deaths": 11, "assists": 7, "adr": 60.1, "hs_pct": 18}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": true, "score": 13, "opp": 9, "kills": 14, "deaths": 12, "assists": 2, "adr": 58.9, "hs_pct": 36}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 12, "deaths": 15, "assists": 6, "adr": 87.7, "hs_pct": 67}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": true, "score": 13, "opp": 2, "kills": 12, "deaths": 6, "assists": 4, "adr": 71.5, "hs_pct": 17}], "rating": 57.92, "rank": 17}, {"name": "Crys", "steamid64": "76561198174767749", "matches": 4, "maps": 4, "rounds": 85, "kills": 60, "deaths": 57, "assists": 26, "damage": 7331, "kd": 1.05, "kpr": 0.71, "adr": 86.2, "hs_pct": 50.0, "multi_kills": 16, "clutch_won": 0, "clutch_att": 4, "clutch_pct": 0.0, "wins": 3, "losses": 1, "win_pct": 75.0, "k3": 3, "k4": 1, "aces": 0, "history": [{"date": "2026-09-26 04:22", "map": "Ancient", "won": true, "score": 13, "opp": 11, "kills": 13, "deaths": 18, "assists": 7, "adr": 78.7, "hs_pct": 38}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": true, "score": 13, "opp": 2, "kills": 7, "deaths": 7, "assists": 6, "adr": 62.3, "hs_pct": 71}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": false, "score": 11, "opp": 13, "kills": 26, "deaths": 18, "assists": 7, "adr": 108.4, "hs_pct": 42}, {"date": "2026-09-12 01:57", "map": "Cache", "won": true, "score": 13, "opp": 9, "kills": 14, "deaths": 14, "assists": 6, "adr": 86.7, "hs_pct": 64}], "rating": 57.56, "rank": 18}, {"name": "accuracY", "steamid64": "76561198797529119", "matches": 6, "maps": 6, "rounds": 129, "kills": 93, "deaths": 97, "assists": 30, "damage": 10002, "kd": 0.96, "kpr": 0.72, "adr": 77.5, "hs_pct": 38.7, "multi_kills": 21, "clutch_won": 2, "clutch_att": 10, "clutch_pct": 20.0, "wins": 2, "losses": 4, "win_pct": 33.3, "k3": 7, "k4": 1, "aces": 0, "history": [{"date": "2026-09-27 02:32", "map": "Train", "won": false, "score": 4, "opp": 13, "kills": 17, "deaths": 15, "assists": 6, "adr": 113.5, "hs_pct": 24}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": false, "score": 3, "opp": 13, "kills": 8, "deaths": 16, "assists": 3, "adr": 69.0, "hs_pct": 38}, {"date": "2026-09-27 00:32", "map": "Cache", "won": false, "score": 10, "opp": 13, "kills": 13, "deaths": 17, "assists": 5, "adr": 44.0, "hs_pct": 23}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": false, "score": 6, "opp": 13, "kills": 15, "deaths": 13, "assists": 3, "adr": 75.2, "hs_pct": 40}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": true, "score": 16, "opp": 14, "kills": 22, "deaths": 20, "assists": 6, "adr": 83.8, "hs_pct": 59}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": true, "score": 13, "opp": 11, "kills": 18, "deaths": 16, "assists": 7, "adr": 83.9, "hs_pct": 39}], "rating": 56.95, "rank": 19}, {"name": "GNS", "steamid64": "76561199057562295", "matches": 16, "maps": 16, "rounds": 348, "kills": 229, "deaths": 258, "assists": 83, "damage": 26560, "kd": 0.89, "kpr": 0.66, "adr": 76.3, "hs_pct": 52.8, "multi_kills": 54, "clutch_won": 6, "clutch_att": 19, "clutch_pct": 31.6, "wins": 5, "losses": 11, "win_pct": 31.2, "k3": 12, "k4": 3, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": true, "score": 13, "opp": 11, "kills": 23, "deaths": 17, "assists": 10, "adr": 101.0, "hs_pct": 57}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": false, "score": 5, "opp": 13, "kills": 8, "deaths": 16, "assists": 7, "adr": 70.8, "hs_pct": 62}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 18, "deaths": 16, "assists": 4, "adr": 77.0, "hs_pct": 50}, {"date": "2026-09-28 23:50", "map": "Cache", "won": false, "score": 20, "opp": 22, "kills": 26, "deaths": 32, "assists": 12, "adr": 83.6, "hs_pct": 54}, {"date": "2026-09-27 02:32", "map": "Train", "won": true, "score": 13, "opp": 4, "kills": 17, "deaths": 9, "assists": 0, "adr": 83.9, "hs_pct": 53}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": false, "score": 3, "opp": 13, "kills": 6, "deaths": 15, "assists": 1, "adr": 48.9, "hs_pct": 67}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": false, "score": 7, "opp": 13, "kills": 8, "deaths": 17, "assists": 7, "adr": 51.9, "hs_pct": 62}, {"date": "2026-09-27 00:32", "map": "Cache", "won": false, "score": 10, "opp": 13, "kills": 18, "deaths": 15, "assists": 4, "adr": 77.6, "hs_pct": 39}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": false, "score": 6, "opp": 13, "kills": 12, "deaths": 17, "assists": 6, "adr": 82.6, "hs_pct": 50}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 18, "deaths": 15, "assists": 9, "adr": 103.5, "hs_pct": 61}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": false, "score": 14, "opp": 16, "kills": 14, "deaths": 12, "assists": 3, "adr": 56.3, "hs_pct": 71}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": false, "score": 4, "opp": 13, "kills": 18, "deaths": 13, "assists": 0, "adr": 86.9, "hs_pct": 50}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": false, "score": 7, "opp": 13, "kills": 10, "deaths": 16, "assists": 4, "adr": 79.0, "hs_pct": 40}, {"date": "2026-09-25 01:25", "map": "Cache", "won": false, "score": 8, "opp": 13, "kills": 13, "deaths": 18, "assists": 5, "adr": 69.8, "hs_pct": 38}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 14, "deaths": 16, "assists": 6, "adr": 84.2, "hs_pct": 43}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": false, "score": 2, "opp": 13, "kills": 6, "deaths": 14, "assists": 5, "adr": 48.3, "hs_pct": 67}], "rating": 55.64, "rank": 20}, {"name": "mancha", "steamid64": "76561198180102149", "matches": 11, "maps": 11, "rounds": 250, "kills": 168, "deaths": 186, "assists": 67, "damage": 19449, "kd": 0.9, "kpr": 0.67, "adr": 77.8, "hs_pct": 45.2, "multi_kills": 40, "clutch_won": 3, "clutch_att": 12, "clutch_pct": 25.0, "wins": 4, "losses": 7, "win_pct": 36.4, "k3": 5, "k4": 2, "aces": 0, "history": [{"date": "2026-09-29 01:25", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 15, "deaths": 20, "assists": 5, "adr": 73.5, "hs_pct": 60}, {"date": "2026-09-28 23:50", "map": "Cache", "won": true, "score": 22, "opp": 20, "kills": 23, "deaths": 30, "assists": 6, "adr": 61.6, "hs_pct": 52}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 4, "deaths": 17, "assists": 9, "adr": 40.9, "hs_pct": 0}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": true, "score": 16, "opp": 14, "kills": 29, "deaths": 19, "assists": 13, "adr": 104.8, "hs_pct": 52}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 11, "deaths": 14, "assists": 7, "adr": 81.3, "hs_pct": 45}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": false, "score": 6, "opp": 13, "kills": 9, "deaths": 17, "assists": 1, "adr": 54.8, "hs_pct": 22}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": false, "score": 4, "opp": 13, "kills": 9, "deaths": 14, "assists": 8, "adr": 87.3, "hs_pct": 33}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": false, "score": 7, "opp": 13, "kills": 12, "deaths": 18, "assists": 4, "adr": 72.3, "hs_pct": 50}, {"date": "2026-09-25 01:25", "map": "Cache", "won": false, "score": 8, "opp": 13, "kills": 27, "deaths": 16, "assists": 4, "adr": 124.0, "hs_pct": 37}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 16, "deaths": 15, "assists": 5, "adr": 81.3, "hs_pct": 50}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": true, "score": 13, "opp": 2, "kills": 13, "deaths": 6, "assists": 5, "adr": 81.5, "hs_pct": 46}], "rating": 55.61, "rank": 21}, {"name": "tx", "steamid64": "76561198013522031", "matches": 10, "maps": 10, "rounds": 230, "kills": 157, "deaths": 168, "assists": 41, "damage": 17347, "kd": 0.93, "kpr": 0.68, "adr": 75.4, "hs_pct": 45.2, "multi_kills": 37, "clutch_won": 5, "clutch_att": 21, "clutch_pct": 23.8, "wins": 4, "losses": 6, "win_pct": 40.0, "k3": 12, "k4": 1, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": false, "score": 11, "opp": 13, "kills": 10, "deaths": 20, "assists": 6, "adr": 58.2, "hs_pct": 40}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": false, "score": 5, "opp": 13, "kills": 12, "deaths": 16, "assists": 1, "adr": 83.4, "hs_pct": 50}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 10, "deaths": 15, "assists": 5, "adr": 53.5, "hs_pct": 30}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": true, "score": 13, "opp": 7, "kills": 9, "deaths": 12, "assists": 7, "adr": 66.9, "hs_pct": 56}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": false, "score": 11, "opp": 13, "kills": 19, "deaths": 17, "assists": 3, "adr": 82.0, "hs_pct": 32}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 16, "deaths": 16, "assists": 5, "adr": 75.9, "hs_pct": 69}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": false, "score": 16, "opp": 19, "kills": 28, "deaths": 27, "assists": 7, "adr": 86.5, "hs_pct": 43}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": false, "score": 10, "opp": 13, "kills": 17, "deaths": 20, "assists": 4, "adr": 73.3, "hs_pct": 35}, {"date": "2026-09-11 01:33", "map": "Cache", "won": false, "score": 7, "opp": 13, "kills": 15, "deaths": 15, "assists": 2, "adr": 82.7, "hs_pct": 47}, {"date": "2026-09-11 00:59", "map": "Mirage", "won": true, "score": 13, "opp": 5, "kills": 21, "deaths": 10, "assists": 1, "adr": 92.8, "hs_pct": 52}], "rating": 55.47, "rank": 22}, {"name": "TO SÓ DE CUECA", "steamid64": "76561198386695099", "matches": 15, "maps": 15, "rounds": 340, "kills": 225, "deaths": 251, "assists": 76, "damage": 25037, "kd": 0.9, "kpr": 0.66, "adr": 73.6, "hs_pct": 56.9, "multi_kills": 51, "clutch_won": 4, "clutch_att": 17, "clutch_pct": 23.5, "wins": 9, "losses": 6, "win_pct": 60.0, "k3": 10, "k4": 1, "aces": 0, "history": [{"date": "2026-09-29 01:25", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 11, "deaths": 20, "assists": 5, "adr": 45.0, "hs_pct": 64}, {"date": "2026-09-28 23:50", "map": "Cache", "won": true, "score": 22, "opp": 20, "kills": 32, "deaths": 32, "assists": 15, "adr": 99.1, "hs_pct": 59}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": true, "score": 13, "opp": 6, "kills": 11, "deaths": 13, "assists": 4, "adr": 69.9, "hs_pct": 55}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 12, "deaths": 19, "assists": 5, "adr": 65.9, "hs_pct": 42}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": false, "score": 14, "opp": 16, "kills": 5, "deaths": 11, "assists": 4, "adr": 22.2, "hs_pct": 40}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 6, "deaths": 18, "assists": 4, "adr": 40.5, "hs_pct": 83}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": false, "score": 6, "opp": 13, "kills": 14, "deaths": 16, "assists": 3, "adr": 83.9, "hs_pct": 43}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": true, "score": 13, "opp": 4, "kills": 13, "deaths": 15, "assists": 6, "adr": 97.1, "hs_pct": 46}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": true, "score": 13, "opp": 7, "kills": 19, "deaths": 15, "assists": 3, "adr": 100.5, "hs_pct": 42}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": false, "score": 9, "opp": 13, "kills": 17, "deaths": 17, "assists": 5, "adr": 81.5, "hs_pct": 59}, {"date": "2026-09-25 01:25", "map": "Cache", "won": true, "score": 13, "opp": 8, "kills": 11, "deaths": 17, "assists": 5, "adr": 53.9, "hs_pct": 55}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": true, "score": 13, "opp": 10, "kills": 24, "deaths": 19, "assists": 5, "adr": 93.4, "hs_pct": 54}, {"date": "2026-09-11 01:33", "map": "Cache", "won": true, "score": 13, "opp": 7, "kills": 18, "deaths": 12, "assists": 4, "adr": 94.5, "hs_pct": 78}, {"date": "2026-09-11 00:59", "map": "Mirage", "won": true, "score": 13, "opp": 5, "kills": 10, "deaths": 13, "assists": 5, "adr": 55.5, "hs_pct": 60}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": true, "score": 13, "opp": 10, "kills": 22, "deaths": 14, "assists": 3, "adr": 101.2, "hs_pct": 68}], "rating": 54.56, "rank": 23}, {"name": "mounjaro1337", "steamid64": "76561197980278308", "matches": 21, "maps": 21, "rounds": 456, "kills": 277, "deaths": 358, "assists": 96, "damage": 31619, "kd": 0.77, "kpr": 0.61, "adr": 69.3, "hs_pct": 60.3, "multi_kills": 60, "clutch_won": 9, "clutch_att": 17, "clutch_pct": 52.9, "wins": 8, "losses": 13, "win_pct": 38.1, "k3": 17, "k4": 0, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": false, "score": 11, "opp": 13, "kills": 20, "deaths": 19, "assists": 8, "adr": 86.9, "hs_pct": 60}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": false, "score": 5, "opp": 13, "kills": 7, "deaths": 16, "assists": 2, "adr": 58.3, "hs_pct": 57}, {"date": "2026-09-28 23:50", "map": "Cache", "won": false, "score": 20, "opp": 22, "kills": 27, "deaths": 33, "assists": 8, "adr": 66.9, "hs_pct": 70}, {"date": "2026-09-27 02:32", "map": "Train", "won": true, "score": 13, "opp": 4, "kills": 11, "deaths": 12, "assists": 6, "adr": 85.8, "hs_pct": 73}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": true, "score": 13, "opp": 3, "kills": 10, "deaths": 10, "assists": 2, "adr": 63.9, "hs_pct": 50}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": true, "score": 13, "opp": 7, "kills": 13, "deaths": 14, "assists": 6, "adr": 85.5, "hs_pct": 69}, {"date": "2026-09-27 00:32", "map": "Cache", "won": false, "score": 10, "opp": 13, "kills": 10, "deaths": 20, "assists": 10, "adr": 75.3, "hs_pct": 60}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": false, "score": 6, "opp": 13, "kills": 10, "deaths": 18, "assists": 2, "adr": 61.4, "hs_pct": 70}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 12, "deaths": 20, "assists": 1, "adr": 46.2, "hs_pct": 75}, {"date": "2026-09-26 04:22", "map": "Ancient", "won": false, "score": 11, "opp": 13, "kills": 14, "deaths": 17, "assists": 4, "adr": 75.0, "hs_pct": 64}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 16, "deaths": 16, "assists": 6, "adr": 96.5, "hs_pct": 62}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": true, "score": 13, "opp": 6, "kills": 13, "deaths": 14, "assists": 1, "adr": 61.7, "hs_pct": 31}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": false, "score": 4, "opp": 13, "kills": 3, "deaths": 15, "assists": 1, "adr": 26.6, "hs_pct": 67}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": false, "score": 7, "opp": 13, "kills": 15, "deaths": 16, "assists": 3, "adr": 78.8, "hs_pct": 20}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": true, "score": 13, "opp": 9, "kills": 18, "deaths": 16, "assists": 5, "adr": 90.9, "hs_pct": 67}, {"date": "2026-09-25 01:25", "map": "Cache", "won": true, "score": 13, "opp": 8, "kills": 11, "deaths": 18, "assists": 4, "adr": 61.9, "hs_pct": 36}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": true, "score": 13, "opp": 11, "kills": 18, "deaths": 15, "assists": 3, "adr": 74.1, "hs_pct": 78}, {"date": "2026-09-12 01:57", "map": "Cache", "won": false, "score": 9, "opp": 13, "kills": 17, "deaths": 17, "assists": 5, "adr": 72.5, "hs_pct": 71}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": false, "score": 10, "opp": 13, "kills": 11, "deaths": 20, "assists": 8, "adr": 69.1, "hs_pct": 55}, {"date": "2026-09-11 01:33", "map": "Cache", "won": false, "score": 7, "opp": 13, "kills": 12, "deaths": 16, "assists": 8, "adr": 77.2, "hs_pct": 58}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": false, "score": 10, "opp": 13, "kills": 9, "deaths": 16, "assists": 3, "adr": 36.1, "hs_pct": 56}], "rating": 53.81, "rank": 24}, {"name": "Britt1n", "steamid64": "76561198060376641", "matches": 2, "maps": 2, "rounds": 57, "kills": 34, "deaths": 40, "assists": 17, "damage": 4121, "kd": 0.85, "kpr": 0.6, "adr": 72.3, "hs_pct": 47.1, "multi_kills": 6, "clutch_won": 3, "clutch_att": 6, "clutch_pct": 50.0, "wins": 2, "losses": 0, "win_pct": 100.0, "k3": 1, "k4": 1, "aces": 0, "history": [{"date": "2026-09-26 03:37", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 15, "deaths": 14, "assists": 7, "adr": 80.2, "hs_pct": 53}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": true, "score": 19, "opp": 16, "kills": 19, "deaths": 26, "assists": 10, "adr": 67.3, "hs_pct": 42}], "rating": 53.54, "rank": 25}, {"name": "itallo", "steamid64": "76561198335362779", "matches": 7, "maps": 7, "rounds": 165, "kills": 105, "deaths": 109, "assists": 34, "damage": 11144, "kd": 0.96, "kpr": 0.64, "adr": 67.5, "hs_pct": 44.8, "multi_kills": 26, "clutch_won": 4, "clutch_att": 12, "clutch_pct": 33.3, "wins": 4, "losses": 3, "win_pct": 57.1, "k3": 3, "k4": 0, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": true, "score": 13, "opp": 11, "kills": 16, "deaths": 15, "assists": 9, "adr": 78.8, "hs_pct": 44}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": false, "score": 5, "opp": 13, "kills": 10, "deaths": 13, "assists": 4, "adr": 53.3, "hs_pct": 60}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 16, "deaths": 17, "assists": 2, "adr": 74.2, "hs_pct": 38}, {"date": "2026-09-27 00:32", "map": "Cache", "won": true, "score": 13, "opp": 10, "kills": 21, "deaths": 12, "assists": 3, "adr": 90.4, "hs_pct": 38}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": true, "score": 13, "opp": 6, "kills": 9, "deaths": 12, "assists": 6, "adr": 67.0, "hs_pct": 56}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 11, "deaths": 15, "assists": 5, "adr": 45.1, "hs_pct": 18}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": false, "score": 16, "opp": 19, "kills": 22, "deaths": 25, "assists": 5, "adr": 61.9, "hs_pct": 59}], "rating": 52.73, "rank": 26}, {"name": "too late", "steamid64": "76561198964702538", "matches": 2, "maps": 2, "rounds": 41, "kills": 22, "deaths": 33, "assists": 8, "damage": 2163, "kd": 0.67, "kpr": 0.54, "adr": 52.8, "hs_pct": 54.5, "multi_kills": 5, "clutch_won": 1, "clutch_att": 1, "clutch_pct": 100.0, "wins": 1, "losses": 1, "win_pct": 50.0, "k3": 0, "k4": 0, "aces": 0, "history": [{"date": "2026-09-11 00:59", "map": "Mirage", "won": false, "score": 5, "opp": 13, "kills": 8, "deaths": 16, "assists": 2, "adr": 45.4, "hs_pct": 50}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": true, "score": 13, "opp": 10, "kills": 14, "deaths": 17, "assists": 6, "adr": 58.5, "hs_pct": 57}], "rating": 50.71, "rank": 27}, {"name": "PedrAO", "steamid64": "76561198077946681", "matches": 8, "maps": 8, "rounds": 192, "kills": 116, "deaths": 151, "assists": 50, "damage": 13729, "kd": 0.77, "kpr": 0.6, "adr": 71.5, "hs_pct": 44.8, "multi_kills": 22, "clutch_won": 2, "clutch_att": 9, "clutch_pct": 22.2, "wins": 1, "losses": 7, "win_pct": 12.5, "k3": 7, "k4": 1, "aces": 0, "history": [{"date": "2026-09-28 23:50", "map": "Cache", "won": false, "score": 20, "opp": 22, "kills": 23, "deaths": 34, "assists": 6, "adr": 60.8, "hs_pct": 35}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": false, "score": 6, "opp": 13, "kills": 9, "deaths": 19, "assists": 7, "adr": 71.9, "hs_pct": 22}, {"date": "2026-09-26 23:02", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 15, "deaths": 18, "assists": 8, "adr": 96.6, "hs_pct": 53}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 8, "deaths": 13, "assists": 2, "adr": 50.4, "hs_pct": 25}, {"date": "2026-09-12 01:57", "map": "Cache", "won": false, "score": 9, "opp": 13, "kills": 9, "deaths": 18, "assists": 6, "adr": 59.3, "hs_pct": 56}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": true, "score": 13, "opp": 11, "kills": 10, "deaths": 17, "assists": 8, "adr": 56.7, "hs_pct": 90}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": false, "score": 10, "opp": 13, "kills": 19, "deaths": 17, "assists": 7, "adr": 92.3, "hs_pct": 58}, {"date": "2026-09-11 01:33", "map": "Cache", "won": false, "score": 7, "opp": 13, "kills": 23, "deaths": 15, "assists": 6, "adr": 94.2, "hs_pct": 30}], "rating": 50.35, "rank": 28}, {"name": "Monk", "steamid64": "76561198849630575", "matches": 1, "maps": 1, "rounds": 42, "kills": 24, "deaths": 30, "assists": 8, "damage": 2852, "kd": 0.8, "kpr": 0.57, "adr": 67.9, "hs_pct": 33.3, "multi_kills": 5, "clutch_won": 2, "clutch_att": 5, "clutch_pct": 40.0, "wins": 1, "losses": 0, "win_pct": 100.0, "k3": 1, "k4": 0, "aces": 0, "history": [{"date": "2026-09-28 23:50", "map": "Cache", "won": true, "score": 22, "opp": 20, "kills": 24, "deaths": 30, "assists": 8, "adr": 67.9, "hs_pct": 33}], "rating": 49.5, "rank": 29}, {"name": "dNs", "steamid64": "76561197988740866", "matches": 4, "maps": 4, "rounds": 78, "kills": 44, "deaths": 63, "assists": 20, "damage": 5788, "kd": 0.7, "kpr": 0.56, "adr": 74.2, "hs_pct": 50.0, "multi_kills": 10, "clutch_won": 0, "clutch_att": 6, "clutch_pct": 0.0, "wins": 1, "losses": 3, "win_pct": 25.0, "k3": 1, "k4": 0, "aces": 0, "history": [{"date": "2026-09-26 00:56", "map": "Mirage", "won": false, "score": 6, "opp": 13, "kills": 9, "deaths": 16, "assists": 3, "adr": 55.5, "hs_pct": 78}, {"date": "2026-09-25 01:25", "map": "Cache", "won": false, "score": 8, "opp": 13, "kills": 13, "deaths": 15, "assists": 6, "adr": 73.7, "hs_pct": 38}, {"date": "2026-09-11 01:33", "map": "Cache", "won": true, "score": 13, "opp": 7, "kills": 11, "deaths": 17, "assists": 8, "adr": 84.3, "hs_pct": 36}, {"date": "2026-09-11 00:59", "map": "Mirage", "won": false, "score": 5, "opp": 13, "kills": 11, "deaths": 15, "assists": 3, "adr": 83.3, "hs_pct": 55}], "rating": 47.11, "rank": 30}, {"name": "mD'", "steamid64": "76561198345705640", "matches": 10, "maps": 10, "rounds": 210, "kills": 116, "deaths": 172, "assists": 45, "damage": 13003, "kd": 0.67, "kpr": 0.55, "adr": 61.9, "hs_pct": 58.6, "multi_kills": 23, "clutch_won": 2, "clutch_att": 9, "clutch_pct": 22.2, "wins": 4, "losses": 6, "win_pct": 40.0, "k3": 6, "k4": 0, "aces": 1, "history": [{"date": "2026-09-27 02:32", "map": "Train", "won": false, "score": 4, "opp": 13, "kills": 5, "deaths": 15, "assists": 2, "adr": 28.2, "hs_pct": 20}, {"date": "2026-09-27 02:06", "map": "Anubis", "won": false, "score": 3, "opp": 13, "kills": 4, "deaths": 15, "assists": 4, "adr": 40.8, "hs_pct": 25}, {"date": "2026-09-27 01:17", "map": "Ancient", "won": false, "score": 7, "opp": 13, "kills": 10, "deaths": 17, "assists": 3, "adr": 42.8, "hs_pct": 40}, {"date": "2026-09-27 00:32", "map": "Cache", "won": true, "score": 13, "opp": 10, "kills": 12, "deaths": 17, "assists": 6, "adr": 66.6, "hs_pct": 50}, {"date": "2026-09-26 23:46", "map": "Dust2", "won": true, "score": 13, "opp": 6, "kills": 13, "deaths": 15, "assists": 5, "adr": 80.9, "hs_pct": 62}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": false, "score": 14, "opp": 16, "kills": 11, "deaths": 25, "assists": 7, "adr": 46.6, "hs_pct": 45}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 16, "deaths": 16, "assists": 3, "adr": 82.6, "hs_pct": 62}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": false, "score": 6, "opp": 13, "kills": 13, "deaths": 17, "assists": 5, "adr": 78.7, "hs_pct": 77}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": true, "score": 13, "opp": 11, "kills": 18, "deaths": 20, "assists": 5, "adr": 73.1, "hs_pct": 72}, {"date": "2026-09-12 01:57", "map": "Cache", "won": true, "score": 13, "opp": 9, "kills": 14, "deaths": 15, "assists": 5, "adr": 74.7, "hs_pct": 71}], "rating": 46.1, "rank": 31}, {"name": "A L T R U I S T A", "steamid64": "76561198146396119", "matches": 2, "maps": 2, "rounds": 41, "kills": 24, "deaths": 33, "assists": 9, "damage": 2690, "kd": 0.73, "kpr": 0.59, "adr": 65.6, "hs_pct": 45.8, "multi_kills": 5, "clutch_won": 0, "clutch_att": 4, "clutch_pct": 0.0, "wins": 1, "losses": 1, "win_pct": 50.0, "k3": 1, "k4": 0, "aces": 0, "history": [{"date": "2026-09-11 00:59", "map": "Mirage", "won": false, "score": 5, "opp": 13, "kills": 11, "deaths": 14, "assists": 4, "adr": 68.2, "hs_pct": 55}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": true, "score": 13, "opp": 10, "kills": 13, "deaths": 19, "assists": 5, "adr": 63.6, "hs_pct": 38}], "rating": 45.75, "rank": 32}, {"name": "g   U   h'", "steamid64": "76561197966454809", "matches": 6, "maps": 6, "rounds": 125, "kills": 70, "deaths": 93, "assists": 22, "damage": 7545, "kd": 0.75, "kpr": 0.56, "adr": 60.4, "hs_pct": 41.4, "multi_kills": 13, "clutch_won": 1, "clutch_att": 8, "clutch_pct": 12.5, "wins": 3, "losses": 3, "win_pct": 50.0, "k3": 0, "k4": 2, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": true, "score": 13, "opp": 11, "kills": 15, "deaths": 18, "assists": 4, "adr": 58.5, "hs_pct": 40}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": true, "score": 13, "opp": 5, "kills": 8, "deaths": 11, "assists": 4, "adr": 47.4, "hs_pct": 38}, {"date": "2026-09-29 01:25", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 21, "deaths": 17, "assists": 4, "adr": 96.5, "hs_pct": 57}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": false, "score": 4, "opp": 13, "kills": 8, "deaths": 16, "assists": 7, "adr": 66.7, "hs_pct": 38}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": false, "score": 7, "opp": 13, "kills": 11, "deaths": 17, "assists": 1, "adr": 56.3, "hs_pct": 27}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": true, "score": 13, "opp": 9, "kills": 7, "deaths": 14, "assists": 2, "adr": 32.4, "hs_pct": 29}], "rating": 44.57, "rank": 33}, {"name": "Jesuszera", "steamid64": "76561198054557419", "matches": 11, "maps": 11, "rounds": 233, "kills": 126, "deaths": 174, "assists": 42, "damage": 14384, "kd": 0.72, "kpr": 0.54, "adr": 61.7, "hs_pct": 46.0, "multi_kills": 24, "clutch_won": 2, "clutch_att": 16, "clutch_pct": 12.5, "wins": 5, "losses": 6, "win_pct": 45.5, "k3": 3, "k4": 0, "aces": 0, "history": [{"date": "2026-09-26 04:22", "map": "Ancient", "won": false, "score": 11, "opp": 13, "kills": 16, "deaths": 16, "assists": 2, "adr": 71.8, "hs_pct": 62}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 12, "deaths": 17, "assists": 1, "adr": 45.6, "hs_pct": 17}, {"date": "2026-09-25 03:39", "map": "Dust2", "won": true, "score": 13, "opp": 4, "kills": 11, "deaths": 9, "assists": 3, "adr": 59.7, "hs_pct": 45}, {"date": "2026-09-25 03:05", "map": "Mirage", "won": true, "score": 13, "opp": 7, "kills": 10, "deaths": 14, "assists": 7, "adr": 63.9, "hs_pct": 20}, {"date": "2026-09-25 02:13", "map": "Ancient", "won": false, "score": 9, "opp": 13, "kills": 14, "deaths": 17, "assists": 4, "adr": 74.9, "hs_pct": 29}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 7, "deaths": 14, "assists": 5, "adr": 58.0, "hs_pct": 57}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": false, "score": 2, "opp": 13, "kills": 6, "deaths": 15, "assists": 3, "adr": 49.1, "hs_pct": 33}, {"date": "2026-09-12 02:45", "map": "Inferno", "won": false, "score": 11, "opp": 13, "kills": 14, "deaths": 21, "assists": 4, "adr": 59.5, "hs_pct": 64}, {"date": "2026-09-12 01:57", "map": "Cache", "won": true, "score": 13, "opp": 9, "kills": 15, "deaths": 14, "assists": 3, "adr": 74.8, "hs_pct": 73}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 6, "deaths": 19, "assists": 3, "adr": 36.3, "hs_pct": 67}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": true, "score": 13, "opp": 10, "kills": 15, "deaths": 18, "assists": 7, "adr": 81.6, "hs_pct": 33}], "rating": 44.24, "rank": 34}, {"name": "redmaKer :D", "steamid64": "76561199528385243", "matches": 4, "maps": 4, "rounds": 84, "kills": 43, "deaths": 66, "assists": 18, "damage": 4640, "kd": 0.65, "kpr": 0.51, "adr": 55.2, "hs_pct": 46.5, "multi_kills": 6, "clutch_won": 1, "clutch_att": 4, "clutch_pct": 25.0, "wins": 2, "losses": 2, "win_pct": 50.0, "k3": 1, "k4": 0, "aces": 0, "history": [{"date": "2026-09-11 02:12", "map": "Inferno", "won": true, "score": 13, "opp": 10, "kills": 7, "deaths": 17, "assists": 4, "adr": 31.9, "hs_pct": 29}, {"date": "2026-09-11 01:33", "map": "Cache", "won": true, "score": 13, "opp": 7, "kills": 9, "deaths": 15, "assists": 3, "adr": 36.0, "hs_pct": 22}, {"date": "2026-09-11 00:59", "map": "Mirage", "won": false, "score": 5, "opp": 13, "kills": 10, "deaths": 17, "assists": 5, "adr": 69.9, "hs_pct": 60}, {"date": "2026-09-11 00:15", "map": "Dust2", "won": false, "score": 10, "opp": 13, "kills": 17, "deaths": 17, "assists": 6, "adr": 83.8, "hs_pct": 59}], "rating": 42.37, "rank": 35}, {"name": "JERO", "steamid64": "76561198377623152", "matches": 4, "maps": 4, "rounds": 78, "kills": 32, "deaths": 60, "assists": 18, "damage": 3890, "kd": 0.53, "kpr": 0.41, "adr": 49.9, "hs_pct": 46.9, "multi_kills": 8, "clutch_won": 2, "clutch_att": 5, "clutch_pct": 40.0, "wins": 2, "losses": 2, "win_pct": 50.0, "k3": 0, "k4": 0, "aces": 0, "history": [{"date": "2026-09-25 02:13", "map": "Ancient", "won": false, "score": 9, "opp": 13, "kills": 13, "deaths": 16, "assists": 6, "adr": 60.5, "hs_pct": 46}, {"date": "2026-09-25 01:25", "map": "Cache", "won": true, "score": 13, "opp": 8, "kills": 10, "deaths": 17, "assists": 8, "adr": 66.9, "hs_pct": 50}, {"date": "2026-09-25 00:01", "map": "Dust2", "won": true, "score": 13, "opp": 7, "kills": 7, "deaths": 12, "assists": 3, "adr": 37.4, "hs_pct": 43}, {"date": "2026-09-24 23:17", "map": "Mirage", "won": false, "score": 2, "opp": 13, "kills": 2, "deaths": 15, "assists": 1, "adr": 27.1, "hs_pct": 50}], "rating": 37.89, "rank": 36}, {"name": "só de cueca", "steamid64": "76561198353504474", "matches": 4, "maps": 4, "rounds": 105, "kills": 45, "deaths": 86, "assists": 20, "damage": 5448, "kd": 0.52, "kpr": 0.43, "adr": 51.9, "hs_pct": 55.6, "multi_kills": 6, "clutch_won": 0, "clutch_att": 3, "clutch_pct": 0.0, "wins": 1, "losses": 3, "win_pct": 25.0, "k3": 0, "k4": 0, "aces": 0, "history": [{"date": "2026-09-12 02:45", "map": "Inferno", "won": false, "score": 11, "opp": 13, "kills": 7, "deaths": 19, "assists": 6, "adr": 45.8, "hs_pct": 43}, {"date": "2026-09-12 01:57", "map": "Cache", "won": false, "score": 9, "opp": 13, "kills": 5, "deaths": 18, "assists": 2, "adr": 21.8, "hs_pct": 40}, {"date": "2026-09-12 00:49", "map": "Mirage", "won": false, "score": 11, "opp": 13, "kills": 14, "deaths": 20, "assists": 4, "adr": 76.7, "hs_pct": 57}, {"date": "2026-09-11 23:38", "map": "Dust2", "won": true, "score": 19, "opp": 16, "kills": 19, "deaths": 29, "assists": 8, "adr": 57.9, "hs_pct": 63}], "rating": 35.51, "rank": 37}, {"name": "KikoLck Bala Torta!! #P90 #AUG", "steamid64": "76561198061281527", "matches": 8, "maps": 8, "rounds": 182, "kills": 66, "deaths": 136, "assists": 28, "damage": 7850, "kd": 0.49, "kpr": 0.36, "adr": 43.1, "hs_pct": 40.9, "multi_kills": 10, "clutch_won": 3, "clutch_att": 11, "clutch_pct": 27.3, "wins": 2, "losses": 6, "win_pct": 25.0, "k3": 1, "k4": 1, "aces": 0, "history": [{"date": "2026-09-29 02:48", "map": "Dust2", "won": false, "score": 11, "opp": 13, "kills": 7, "deaths": 20, "assists": 2, "adr": 31.2, "hs_pct": 43}, {"date": "2026-09-29 02:12", "map": "Nuke", "won": true, "score": 13, "opp": 5, "kills": 13, "deaths": 10, "assists": 2, "adr": 63.1, "hs_pct": 31}, {"date": "2026-09-26 04:22", "map": "Ancient", "won": false, "score": 11, "opp": 13, "kills": 13, "deaths": 14, "assists": 2, "adr": 65.8, "hs_pct": 46}, {"date": "2026-09-26 03:37", "map": "Mirage", "won": true, "score": 13, "opp": 9, "kills": 10, "deaths": 15, "assists": 6, "adr": 47.7, "hs_pct": 50}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": false, "score": 14, "opp": 16, "kills": 12, "deaths": 24, "assists": 3, "adr": 43.7, "hs_pct": 50}, {"date": "2026-09-25 01:25", "map": "Cache", "won": false, "score": 8, "opp": 13, "kills": 3, "deaths": 16, "assists": 5, "adr": 32.4, "hs_pct": 33}, {"date": "2026-09-11 02:12", "map": "Inferno", "won": false, "score": 10, "opp": 13, "kills": 5, "deaths": 17, "assists": 4, "adr": 37.3, "hs_pct": 40}, {"date": "2026-09-11 01:33", "map": "Cache", "won": false, "score": 7, "opp": 13, "kills": 3, "deaths": 20, "assists": 4, "adr": 24.4, "hs_pct": 0}], "rating": 32.49, "rank": 38}, {"name": "Tiro fofo", "steamid64": "76561198077584671", "matches": 4, "maps": 4, "rounds": 91, "kills": 35, "deaths": 69, "assists": 24, "damage": 4301, "kd": 0.51, "kpr": 0.38, "adr": 47.3, "hs_pct": 40.0, "multi_kills": 7, "clutch_won": 0, "clutch_att": 4, "clutch_pct": 0.0, "wins": 2, "losses": 2, "win_pct": 50.0, "k3": 2, "k4": 0, "aces": 0, "history": [{"date": "2026-09-26 03:37", "map": "Mirage", "won": false, "score": 9, "opp": 13, "kills": 2, "deaths": 18, "assists": 4, "adr": 22.5, "hs_pct": 50}, {"date": "2026-09-26 02:20", "map": "Inferno", "won": true, "score": 16, "opp": 14, "kills": 16, "deaths": 22, "assists": 9, "adr": 48.3, "hs_pct": 31}, {"date": "2026-09-26 01:41", "map": "Dust2", "won": false, "score": 7, "opp": 13, "kills": 8, "deaths": 16, "assists": 7, "adr": 61.5, "hs_pct": 62}, {"date": "2026-09-26 00:56", "map": "Mirage", "won": true, "score": 13, "opp": 6, "kills": 9, "deaths": 13, "assists": 4, "adr": 59.4, "hs_pct": 33}], "rating": 31.74, "rank": 39}], "maps": [{"map": "Dust2", "date": "2026-09-29 02:48", "team1": "KikoLck Bala Torta P90 AUG", "team2": "itallo", "score1": 11, "score2": 13, "winner": "itallo", "mvp": "trojan", "mvp_kills": 28, "mvp_deaths": 19, "mvp_adr": 108.7}, {"map": "Nuke", "date": "2026-09-29 02:12", "team1": "tx", "team2": "g U h", "score1": 5, "score2": 13, "winner": "g U h", "mvp": "nK1 ★", "mvp_kills": 24, "mvp_deaths": 11, "mvp_adr": 129.2}, {"map": "Mirage", "date": "2026-09-29 01:25", "team1": "GNS", "team2": "itallo", "score1": 13, "score2": 11, "winner": "GNS", "mvp": "trojan", "mvp_kills": 23, "mvp_deaths": 16, "mvp_adr": 98.6}, {"map": "Cache", "date": "2026-09-28 23:50", "team1": "PedrAO", "team2": "Wise", "score1": 20, "score2": 22, "winner": "Wise", "mvp": "MX", "mvp_kills": 46, "mvp_deaths": 28, "mvp_adr": 89.1}, {"map": "Train", "date": "2026-09-27 02:32", "team1": "h", "team2": "bAndi1337", "score1": 4, "score2": 13, "winner": "bAndi1337", "mvp": "visc4rd", "mvp_kills": 22, "mvp_deaths": 9, "mvp_adr": 130.5}, {"map": "Anubis", "date": "2026-09-27 02:06", "team1": "unkah", "team2": "h", "score1": 3, "score2": 13, "winner": "h", "mvp": "visc4rd", "mvp_kills": 18, "mvp_deaths": 7, "mvp_adr": 95.9}, {"map": "Ancient", "date": "2026-09-27 01:17", "team1": "bAndi1337", "team2": "Flex", "score1": 13, "score2": 7, "winner": "bAndi1337", "mvp": "visc4rd", "mvp_kills": 27, "mvp_deaths": 11, "mvp_adr": 128.3}, {"map": "Cache", "date": "2026-09-27 00:32", "team1": "GNS", "team2": "mD", "score1": 10, "score2": 13, "winner": "mD", "mvp": "visc4rd", "mvp_kills": 29, "mvp_deaths": 14, "mvp_adr": 114.9}, {"map": "Dust2", "date": "2026-09-26 23:46", "team1": "visc4rd", "team2": "mounjaro1337", "score1": 13, "score2": 6, "winner": "visc4rd", "mvp": "h$collection", "mvp_kills": 37, "mvp_deaths": 6, "mvp_adr": 170.2}, {"map": "Mirage", "date": "2026-09-26 23:02", "team1": "PedrAO", "team2": "itallo", "score1": 9, "score2": 13, "winner": "itallo", "mvp": "♔ Flex", "mvp_kills": 25, "mvp_deaths": 14, "mvp_adr": 126.9}, {"map": "Ancient", "date": "2026-09-26 04:22", "team1": "zdR", "team2": "KikoLck Bala Torta P90 AUG", "score1": 13, "score2": 11, "winner": "zdR", "mvp": "trojan", "mvp_kills": 22, "mvp_deaths": 16, "mvp_adr": 99.3}, {"map": "Mirage", "date": "2026-09-26 03:37", "team1": "trojan", "team2": "MX", "score1": 13, "score2": 9, "winner": "trojan", "mvp": "zdR", "mvp_kills": 29, "mvp_deaths": 15, "mvp_adr": 131.6}, {"map": "Inferno", "date": "2026-09-26 02:20", "team1": "mD", "team2": "Tiro fofo", "score1": 14, "score2": 16, "winner": "Tiro fofo", "mvp": "trojan", "mvp_kills": 30, "mvp_deaths": 21, "mvp_adr": 104.1}, {"map": "Dust2", "date": "2026-09-26 01:41", "team1": "Tiro fofo", "team2": "trojan", "score1": 7, "score2": 13, "winner": "trojan", "mvp": "zdR", "mvp_kills": 24, "mvp_deaths": 18, "mvp_adr": 120.8}, {"map": "Mirage", "date": "2026-09-26 00:56", "team1": "mounjaro1337", "team2": "TO SÓ DE CUECA", "score1": 13, "score2": 6, "winner": "mounjaro1337", "mvp": "trojan", "mvp_kills": 22, "mvp_deaths": 14, "mvp_adr": 125.1}, {"map": "Dust2", "date": "2026-09-25 03:39", "team1": "Jesuszera", "team2": "MX", "score1": 13, "score2": 4, "winner": "Jesuszera", "mvp": "h$collection", "mvp_kills": 23, "mvp_deaths": 8, "mvp_adr": 124.0}, {"map": "Mirage", "date": "2026-09-25 03:05", "team1": "mounjaro1337", "team2": "Jesuszera", "score1": 7, "score2": 13, "winner": "Jesuszera", "mvp": "h$collection", "mvp_kills": 23, "mvp_deaths": 9, "mvp_adr": 106.9}, {"map": "Ancient", "date": "2026-09-25 02:13", "team1": "mounjaro1337", "team2": "JERO", "score1": 13, "score2": 9, "winner": "mounjaro1337", "mvp": "MX", "mvp_kills": 25, "mvp_deaths": 14, "mvp_adr": 110.1}, {"map": "Cache", "date": "2026-09-25 01:25", "team1": "JERO", "team2": "KikoLck Bala Torta P90 AUG", "score1": 13, "score2": 8, "winner": "JERO", "mvp": "mancha", "mvp_kills": 27, "mvp_deaths": 16, "mvp_adr": 124.0}, {"map": "Dust2", "date": "2026-09-25 00:01", "team1": "KVICHA KVARACHUPISCO", "team2": "zdR", "score1": 13, "score2": 7, "winner": "KVICHA KVARACHUPISCO", "mvp": "MX", "mvp_kills": 20, "mvp_deaths": 12, "mvp_adr": 84.7}, {"map": "Mirage", "date": "2026-09-24 23:17", "team1": "JERO", "team2": "TsSx", "score1": 2, "score2": 13, "winner": "TsSx", "mvp": "TsSx:*", "mvp_kills": 21, "mvp_deaths": 5, "mvp_adr": 134.2}, {"map": "Inferno", "date": "2026-09-12 02:45", "team1": "mounjaro1337", "team2": "tx", "score1": 13, "score2": 11, "winner": "mounjaro1337", "mvp": "Crys", "mvp_kills": 26, "mvp_deaths": 18, "mvp_adr": 108.4}, {"map": "Cache", "date": "2026-09-12 01:57", "team1": "mD", "team2": "PedrAO", "score1": 13, "score2": 9, "winner": "mD", "mvp": "MX", "mvp_kills": 23, "mvp_deaths": 14, "mvp_adr": 121.7}, {"map": "Mirage", "date": "2026-09-12 00:49", "team1": "tx", "team2": "Hugod", "score1": 13, "score2": 11, "winner": "tx", "mvp": "zdR", "mvp_kills": 27, "mvp_deaths": 17, "mvp_adr": 101.8}, {"map": "Dust2", "date": "2026-09-11 23:38", "team1": "Alek1Ng", "team2": "itallo", "score1": 19, "score2": 16, "winner": "Alek1Ng", "mvp": "trojan", "mvp_kills": 35, "mvp_deaths": 25, "mvp_adr": 102.7}, {"map": "Inferno", "date": "2026-09-11 02:12", "team1": "TO SÓ DE CUECA", "team2": "KikoLck Bala Torta P90 AUG", "score1": 13, "score2": 10, "winner": "TO SÓ DE CUECA", "mvp": "RUANZA1", "mvp_kills": 32, "mvp_deaths": 15, "mvp_adr": 127.5}, {"map": "Cache", "date": "2026-09-11 01:33", "team1": "KikoLck Bala Torta P90 AUG", "team2": "Alek1Ng", "score1": 7, "score2": 13, "winner": "Alek1Ng", "mvp": "PedrAO", "mvp_kills": 23, "mvp_deaths": 15, "mvp_adr": 94.2}, {"map": "Mirage", "date": "2026-09-11 00:59", "team1": "dNs", "team2": "Alek1Ng", "score1": 5, "score2": 13, "winner": "Alek1Ng", "mvp": "Alek1Ng", "mvp_kills": 22, "mvp_deaths": 7, "mvp_adr": 133.0}, {"map": "Dust2", "date": "2026-09-11 00:15", "team1": "redmaKer D", "team2": "A L T R U I S T A", "score1": 10, "score2": 13, "winner": "A L T R U I S T A", "mvp": "sirhardneja", "mvp_kills": 27, "mvp_deaths": 20, "mvp_adr": 127.4}], "period": "11/09 a 29/09", "sources": "matchzy.db + matchzy (1).db", "teamSize": 5, "minRounds": 10};
+const ALL = PAYLOAD.players;
+const MAPS = PAYLOAD.maps;
+
+const ICONS = {
+  trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  flame: '<path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 .3 2 1.5 3 2.5 3 0-3-1-5 0-8z"/>',
+  skull: '<path d="M12 3a8 8 0 0 0-5 14.2V20h10v-2.8A8 8 0 0 0 12 3z"/><circle cx="9" cy="11" r="1.5"/><circle cx="15" cy="11" r="1.5"/><path d="M10 20v-2M14 20v-2"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.5-3.5 8-8 9-4.5-1-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
+  zap: '<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>',
+  star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>',
+  medal: '<circle cx="12" cy="15" r="6"/><path d="M8.5 10.2L6 3h4l2 4 2-4h4l-2.5 7.2"/>',
+};
+const icon = (n) => '<svg class="i" viewBox="0 0 24 24">' + ICONS[n] + '</svg>';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+const fmt = (v, d = 0) => Number(v).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
+const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+const isAlnum = (ch) => ch.toLowerCase() !== ch.toUpperCase() || "0123456789".includes(ch);
+const initials = (name) => {
+  const words = String(name || "?").split(" ").map((w) => Array.from(w).filter(isAlnum).join("")).filter(Boolean);
+  if (!words.length) return "?";
+  const s = words.length > 1 ? Array.from(words[0])[0] + Array.from(words[1])[0] : Array.from(words[0]).slice(0, 2).join("");
+  return s.toUpperCase();
+};
+const tierOf = (r) => (r >= 78 ? "S" : r >= 70 ? "A" : r >= 60 ? "B" : r >= 50 ? "C" : "D");
+const shortDate = (d) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) + " " + d.slice(11, 16) : "");
+
+/* ---------- tema ---------- */
+(function () {
+  const root = document.documentElement;
+  let saved = null;
+  try { saved = localStorage.getItem("mix-theme"); } catch (e) {}
+  if (saved) root.dataset.theme = saved;
+  $("theme-btn").addEventListener("click", () => {
+    const cur = root.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    const next = cur === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    try { localStorage.setItem("mix-theme", next); } catch (e) {}
+    renderScatter();
+  });
+})();
+
+/* ---------- cabeçalho ---------- */
+const totalRounds = MAPS.reduce((s, m) => s + m.score1 + m.score2, 0);
+const totalKills = ALL.reduce((s, p) => s + p.kills, 0);
+const totalHs = ALL.reduce((s, p) => s + p.kills * p.hs_pct / 100, 0);
+$("hero-sub").innerHTML =
+  "<b>" + esc(PAYLOAD.period || "") + "</b> · só mapas finalizados " + PAYLOAD.teamSize + "x" + PAYLOAD.teamSize +
+  " · fonte: " + esc(PAYLOAD.sources);
+$("kpis").innerHTML = [
+  ["Mapas", fmt(MAPS.length)],
+  ["Rounds", fmt(totalRounds)],
+  ["Jogadores", fmt(ALL.length)],
+  ["Kills", fmt(totalKills)],
+  ["Headshot", fmt(totalKills ? (totalHs / totalKills) * 100 : 0, 1) + "%"],
+].map(([l, v]) => '<div class="kpi"><div class="l">' + l + '</div><div class="v display num">' + v + "</div></div>").join("");
+$("maps-count").textContent = plural(MAPS.length, "mapa", "mapas");
+$("footer").innerHTML =
+  "<b>Como ler.</b> Só entram mapas finalizados em que os dois times estavam completos; espectadores são ignorados. " +
+  "<b>MixScore</b> combina kills por round, ADR, HS%, clutch% e K/D numa nota só. " +
+  "<b>Tiers</b>: S ≥ 78 · A ≥ 70 · B ≥ 60 · C ≥ 50 · D abaixo disso. " +
+  "Jogadores com menos de " + PAYLOAD.minRounds + " rounds não aparecem.";
+
+/* ---------- estado ---------- */
+const state = { minMaps: 1, q: "", sortKey: "rating", sortDir: -1, open: null };
+const FILTERS = [1, 3, 5, 10].filter((n) => n === 1 || ALL.filter((p) => p.matches >= n).length >= 3);
+
+function visiblePlayers() {
+  return ALL.filter((p) => p.matches >= state.minMaps)
+    .slice()
+    .sort((a, b) => b.rating - a.rating)
+    .map((p, i) => Object.assign({}, p, { rank: i + 1 }));
+}
+
+function renderSeg() {
+  $("seg").innerHTML = FILTERS.map((n) =>
+    '<button type="button" data-n="' + n + '" aria-pressed="' + (state.minMaps === n) + '">' +
+    (n === 1 ? "Todos" : n + "+ mapas") + "</button>").join("");
+  $("seg").querySelectorAll("button").forEach((b) =>
+    b.addEventListener("click", () => { state.minMaps = Number(b.dataset.n); state.open = null; renderAll(); }));
+}
+
+/* ---------- pódio ---------- */
+function renderPodium(list) {
+  const top = list.slice(0, 3);
+  $("podium-note").textContent = state.minMaps > 1 ? "entre quem jogou " + state.minMaps + "+ mapas" : "";
+  const order = [1, 0, 2];
+  $("podium").innerHTML = order.map((i) => {
+    const p = top[i];
+    if (!p) return "<div></div>";
+    const stats = [["K/D", fmt(p.kd, 2)], ["ADR", fmt(p.adr, 1)], ["HS", fmt(p.hs_pct, 0) + "%"], ["V–D", p.wins + "–" + p.losses]];
+    return '<div class="card pod p' + (i + 1) + '">' +
+      '<div class="ghost display">' + (i + 1) + "</div>" +
+      '<div class="place">' + icon("medal") + (i + 1) + "º lugar</div>" +
+      '<div class="who"><div class="avatar">' + esc(initials(p.name)) + '</div><div style="min-width:0">' +
+      '<div class="pname">' + esc(p.name) + '</div><div class="pmeta">' +
+      plural(p.matches, "mapa", "mapas") + " · " + fmt(p.win_pct, 0) + "% de vitórias</div></div></div>" +
+      '<div class="score"><span class="v display num">' + fmt(p.rating, 1) + '</span><span class="l">MixScore</span></div>' +
+      '<div class="stats">' + stats.map(([l, v]) => '<div><div class="l">' + l + '</div><div class="v num">' + v + "</div></div>").join("") + "</div>" +
+      "</div>";
+  }).join("");
+}
+
+/* ---------- destaques ---------- */
+function renderAwards(list) {
+  const best = (key) => list.reduce((a, b) => (!a || b[key] > a[key] ? b : a), null);
+  const defs = [
+    { l: "Mais vitórias", k: "wins", ic: "trophy", v: (p) => p.wins, h: (p) => p.wins + "V " + p.losses + "D · " + fmt(p.win_pct, 0) + "% de aproveitamento" },
+    { l: "Maior dano (ADR)", k: "adr", ic: "flame", v: (p) => fmt(p.adr, 1), h: (p) => fmt(p.damage) + " de dano em " + p.rounds + " rounds" },
+    { l: "Melhor K/D", k: "kd", ic: "skull", v: (p) => fmt(p.kd, 2), h: (p) => p.kills + " kills · " + p.deaths + " mortes" },
+    { l: "Mira de headshot", k: "hs_pct", ic: "target", v: (p) => fmt(p.hs_pct, 1) + "%", h: (p) => Math.round(p.kills * p.hs_pct / 100) + " de " + p.kills + " kills na cabeça" },
+    { l: "Rei do clutch", k: "clutch_won", ic: "shield", v: (p) => p.clutch_won, h: (p) => "venceu " + p.clutch_won + " de " + p.clutch_att + " (1v1 e 1v2)" },
+    { l: "Multi-kills", k: "multi_kills", ic: "zap", v: (p) => p.multi_kills, h: (p) => p.k4 + " quadras · " + plural(p.aces, "ace", "aces") },
+  ];
+  $("awards").innerHTML = defs.map((d) => {
+    const p = best(d.k);
+    if (!p) return "";
+    return '<div class="card award"><div class="ic">' + icon(d.ic) + '</div><div class="body">' +
+      '<div class="l">' + d.l + '</div><div class="pname">' + esc(p.name) + '</div><div class="hint">' + d.h(p) + "</div></div>" +
+      '<div class="v display num">' + d.v(p) + "</div></div>";
+  }).join("");
+}
+
+/* ---------- scatter ADR × K/D ---------- */
+let scatterList = [];
+function renderScatter(list) {
+  if (list) scatterList = list;
+  list = scatterList;
+  const box = $("scatter");
+  const tip = $("tip");
+  box.querySelectorAll("svg").forEach((s) => s.remove());
+  if (!list.length) return;
+  const W = Math.max(320, box.clientWidth);
+  const H = W < 600 ? 320 : 400;
+  const m = { l: 44, r: 16, t: 14, b: 40 };
+  const adrs = list.map((p) => p.adr), kds = list.map((p) => p.kd);
+  const x0 = Math.floor((Math.min(...adrs) - 4) / 10) * 10, x1 = Math.ceil((Math.max(...adrs) + 4) / 10) * 10;
+  const y0 = 0, y1 = Math.ceil((Math.max(...kds) + 0.1) * 4) / 4;
+  const sx = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+  const sy = (v) => H - m.b - ((v - y0) / (y1 - y0)) * (H - m.t - m.b);
+  const sortedAdr = adrs.slice().sort((a, b) => a - b);
+  const medAdr = sortedAdr[Math.floor(sortedAdr.length / 2)];
+  const maxMaps = Math.max(...list.map((p) => p.matches));
+  const rad = (p) => 4 + 7 * Math.sqrt(p.matches / maxMaps);
+
+  let g = "";
+  for (let x = x0; x <= x1; x += 10) {
+    g += '<line x1="' + sx(x) + '" x2="' + sx(x) + '" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--grid)" />';
+    g += '<text class="tick" x="' + sx(x) + '" y="' + (H - m.b + 18) + '" text-anchor="middle">' + x + "</text>";
+  }
+  const ystep = y1 > 2 ? 0.5 : 0.25;
+  for (let y = y0; y <= y1 + 1e-9; y += ystep) {
+    g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + sy(y) + '" y2="' + sy(y) + '" stroke="var(--grid)" />';
+    g += '<text class="tick" x="' + (m.l - 8) + '" y="' + (sy(y) + 4) + '" text-anchor="end">' + fmt(y, 2) + "</text>";
+  }
+  g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + (H - m.b) + '" y2="' + (H - m.b) + '" stroke="var(--baseline)" />';
+  if (1 >= y0 && 1 <= y1) g += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + sy(1) + '" y2="' + sy(1) + '" stroke="var(--baseline)" stroke-dasharray="4 4" stroke-width="1.5" />';
+  g += '<line x1="' + sx(medAdr) + '" x2="' + sx(medAdr) + '" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--baseline)" stroke-dasharray="4 4" stroke-width="1.5" />';
+  g += '<text class="quad" x="' + (sx(medAdr) + 8) + '" y="' + (m.t + 14) + '">Carregam o time ↗</text>';
+  g += '<text class="quad" x="' + (m.l + 8) + '" y="' + (H - m.b - 8) + '">Em evolução</text>';
+  g += '<text class="axis-title" x="' + (W - m.r) + '" y="' + (H - 4) + '" text-anchor="end">ADR (dano por round) →</text>';
+
+  const q = state.q;
+  const pts = list.slice().sort((a, b) => b.matches - a.matches).map((p) => {
+    const match = !q || p.name.toLowerCase().includes(q);
+    return '<circle class="pt' + (q && !match ? " dim" : "") + (q && match ? " hl" : "") + '" data-id="' + p.steamid64 + '" cx="' + sx(p.adr) + '" cy="' + sy(p.kd) + '" r="' + rad(p) + '" />';
+  }).join("");
+
+  // rótulos só pros 5 primeiros do ranking (e pra quem bate na busca)
+  const labeled = list.filter((p) => p.rank <= 5 || (q && p.name.toLowerCase().includes(q)));
+  // posiciona cada rótulo no primeiro lugar livre (direita, esquerda, acima, abaixo)
+  const placed = [];
+  const hits = (b) => placed.some((o) => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y) ||
+    list.some((p) => { const cx = sx(p.adr), cy = sy(p.kd), r = rad(p);
+      return cx + r > b.x && cx - r < b.x + b.w && cy + r > b.y && cy - r < b.y + b.h; });
+  const lbls = labeled.slice().sort((a, b) => a.rank - b.rank).map((p) => {
+    const cx = sx(p.adr), cy = sy(p.kd), r = rad(p);
+    const w = p.name.length * 6.6 + 4, h = 14;
+    const spots = [
+      { x: cx + r + 5, y: cy - h / 2, a: "start" },
+      { x: cx - r - 5 - w, y: cy - h / 2, a: "end" },
+      { x: cx - w / 2, y: cy - r - 4 - h, a: "middle" },
+      { x: cx - w / 2, y: cy + r + 4, a: "middle" },
+      { x: cx + r + 5, y: cy - h / 2 - 14, a: "start" },
+      { x: cx - r - 5 - w, y: cy - h / 2 + 14, a: "end" },
+    ].filter((b) => b.x >= m.l && b.x + w <= W - m.r && b.y >= m.t && b.y + h <= H - m.b);
+    const spot = spots.find((b) => !hits({ x: b.x, y: b.y, w, h })) || spots[0];
+    if (!spot) return "";
+    placed.push({ x: spot.x, y: spot.y, w, h });
+    const tx = spot.a === "start" ? spot.x : spot.a === "end" ? spot.x + w : spot.x + w / 2;
+    return '<text class="lbl" x="' + tx + '" y="' + (spot.y + 11) + '" text-anchor="' + spot.a + '">' + esc(p.name) + "</text>";
+  }).join("");
+
+  const svg = '<svg viewBox="0 0 ' + W + " " + H + '" height="' + H + '" role="img" aria-label="Gráfico de dispersão: ADR por K/D de cada jogador">' +
+    '<text class="axis-title" x="' + m.l + '" y="' + (m.t - 2) + '">K/D ↑</text>' + g + pts + lbls +
+    '<circle id="hover-ring" r="0" fill="none" stroke="var(--text)" stroke-width="2" /></svg>';
+  box.insertAdjacentHTML("afterbegin", svg);
+  const svgEl = box.querySelector("svg");
+  const ring = svgEl.querySelector("#hover-ring");
+
+  const move = (ev) => {
+    const rect = svgEl.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * W;
+    const py = ((ev.clientY - rect.top) / rect.height) * H;
+    let bestP = null, bestD = 26 * 26;
+    list.forEach((p) => {
+      const d = (sx(p.adr) - px) ** 2 + (sy(p.kd) - py) ** 2;
+      if (d < bestD) { bestD = d; bestP = p; }
+    });
+    if (!bestP) { tip.classList.remove("on"); ring.setAttribute("r", 0); return; }
+    ring.setAttribute("cx", sx(bestP.adr)); ring.setAttribute("cy", sy(bestP.kd)); ring.setAttribute("r", rad(bestP) + 3);
+    tip.innerHTML = '<div class="t">#' + bestP.rank + " " + esc(bestP.name) + "</div>" +
+      [["MixScore", fmt(bestP.rating, 1)], ["K/D", fmt(bestP.kd, 2)], ["ADR", fmt(bestP.adr, 1)], ["Mapas", bestP.matches + " (" + bestP.wins + "V " + bestP.losses + "D)"]]
+        .map(([l, v]) => '<div class="r"><span>' + l + "</span><b>" + v + "</b></div>").join("");
+    const bx = box.getBoundingClientRect();
+    let left = ev.clientX - bx.left + 14, top = ev.clientY - bx.top + 14;
+    if (left + 190 > bx.width) left = ev.clientX - bx.left - 190;
+    if (top + 120 > bx.height) top = ev.clientY - bx.top - 120;
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+    tip.classList.add("on");
+  };
+  svgEl.addEventListener("pointermove", move);
+  svgEl.addEventListener("pointerleave", () => { tip.classList.remove("on"); ring.setAttribute("r", 0); });
+}
+let rsz;
+addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(() => renderScatter(), 120); });
+
+/* ---------- tabela ---------- */
+const COLUMNS = [
+  { key: "rank", label: "#", cls: "rank left rankh" },
+  { key: "name", label: "Jogador", cls: "left sticky" },
+  { key: "rating", label: "MixScore" },
+  { key: "wins", label: "V–D" },
+  { key: "kd", label: "K/D" },
+  { key: "adr", label: "ADR" },
+  { key: "hs_pct", label: "HS%" },
+  { key: "kills", label: "K" },
+  { key: "deaths", label: "D" },
+  { key: "assists", label: "A" },
+  { key: "multi_kills", label: "Multi" },
+  { key: "clutch_pct", label: "Clutch" },
+  { key: "_chev", label: "" },
+];
+
+function cell(p, key, maxRating) {
+  switch (key) {
+    case "rank": return p.rank;
+    case "name":
+      return '<div class="pcell"><div class="avatar">' + esc(initials(p.name)) + '</div><div><div class="pname">' + esc(p.name) +
+        ' <span class="tier ' + tierOf(p.rating) + '" title="Tier ' + tierOf(p.rating) + '">' + tierOf(p.rating) + '</span></div><div class="pmeta">' +
+        plural(p.matches, "mapa", "mapas") + " · " + p.rounds + " rounds</div></div></div>";
+    case "rating":
+      return '<div class="scorecell"><div class="bar"><i style="width:' + (p.rating / maxRating) * 100 + '%"></i></div><b>' + fmt(p.rating, 1) + "</b></div>";
+    case "wins": return '<span style="color:var(--text);font-weight:600">' + p.wins + "–" + p.losses + '</span><span class="sub">' + fmt(p.win_pct, 0) + "%</span>";
+    case "kd": {
+      const up = p.kd >= 1;
+      return '<span class="kd ' + (up ? "up" : "down") + '"><span class="tri">' + (up ? "▲" : "▼") + "</span>" + fmt(p.kd, 2) + "</span>";
+    }
+    case "adr": return '<span style="color:var(--text);font-weight:600">' + fmt(p.adr, 1) + "</span>";
+    case "hs_pct": return fmt(p.hs_pct, 1) + "%";
+    case "clutch_pct": return (p.clutch_att ? fmt(p.clutch_pct, 0) + "%" : "—") + '<span class="sub">' + p.clutch_won + "/" + p.clutch_att + "</span>";
+    case "_chev": return icon("chev");
+    default: return p[key];
+  }
+}
+
+function detailRow(p) {
+  const ds = [
+    ["K/round", fmt(p.kpr, 2)], ["Assists", p.assists],
+    ["Triplas", p.k3], ["Quadras", p.k4],
+    ["Aces", p.aces], ["Clutches", p.clutch_won + "/" + p.clutch_att],
+  ];
+  const hist = p.history.map((h) =>
+    '<tr><td class="left">' + shortDate(h.date) + '</td><td class="left" style="color:var(--text)">' + esc(h.map) + "</td>" +
+    '<td><span class="res ' + (h.won ? "w" : "l") + '">' + (h.won ? "V" : "D") + "</span></td>" +
+    "<td>" + h.score + "–" + h.opp + '</td><td style="color:var(--text)">' + h.kills + "/" + h.deaths + "/" + h.assists + "</td>" +
+    "<td>" + fmt(h.adr, 1) + "</td><td>" + h.hs_pct + "%</td></tr>").join("");
+  return '<tr class="detail"><td colspan="' + COLUMNS.length + '"><div class="detail-inner">' +
+    '<div class="dstats">' + ds.map(([l, v]) => '<div class="dstat"><div class="l">' + l + '</div><div class="v display num">' + v + "</div></div>").join("") + "</div>" +
+    '<div class="hist"><table><thead><tr><th class="left">Data</th><th class="left">Mapa</th><th>Res.</th><th>Placar</th><th>K/D/A</th><th>ADR</th><th>HS</th></tr></thead><tbody>' +
+    hist + "</tbody></table></div></div></td></tr>";
+}
+
+function renderTable(list) {
+  const q = state.q;
+  const rows = list.filter((p) => !q || p.name.toLowerCase().includes(q)).sort((a, b) => {
+    const va = a[state.sortKey], vb = b[state.sortKey];
+    if (typeof va === "string") return va.localeCompare(vb, "pt-BR") * state.sortDir;
+    return (va - vb) * state.sortDir;
+  });
+  const maxRating = Math.max(...ALL.map((p) => p.rating), 1);
+
+  $("thead-row").innerHTML = COLUMNS.map((c) => {
+    const cls = (c.cls || "").replace("rank ", "");
+    if (c.key === "_chev") return '<th class="' + cls + '"></th>';
+    const sorted = c.key === state.sortKey;
+    return '<th class="' + cls + '"' + (sorted ? ' aria-sort="' + (state.sortDir < 0 ? "descending" : "ascending") + '"' : "") +
+      '><button type="button" data-k="' + c.key + '">' + c.label + (sorted ? '<span class="arrow">' + (state.sortDir < 0 ? "▼" : "▲") + "</span>" : "") + "</button></th>";
+  }).join("");
+  $("thead-row").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.k;
+    if (state.sortKey === k) state.sortDir *= -1;
+    else { state.sortKey = k; state.sortDir = k === "name" || k === "rank" ? 1 : -1; }
+    renderTable(list);
+  }));
+
+  if (!rows.length) {
+    $("tbody").innerHTML = '<tr><td class="empty" colspan="' + COLUMNS.length + '">Nenhum jogador encontrado.</td></tr>';
+  } else {
+    $("tbody").innerHTML = rows.map((p) => {
+      const open = state.open === p.steamid64;
+      return '<tr class="row' + (p.rank <= 3 ? " r" + p.rank : "") + (open ? " open" : "") + '" data-id="' + p.steamid64 + '" aria-expanded="' + open + '">' +
+        COLUMNS.map((c) => '<td class="' + (c.cls || "") + (c.key === "_chev" ? " chev" : "") + '">' + cell(p, c.key, maxRating) + "</td>").join("") +
+        "</tr>" + (open ? detailRow(p) : "");
+    }).join("");
+  }
+  $("tbody").querySelectorAll("tr.row").forEach((tr) => tr.addEventListener("click", () => {
+    state.open = state.open === tr.dataset.id ? null : tr.dataset.id;
+    renderTable(list);
+  }));
+  $("count").textContent = rows.length + " de " + list.length + " jogadores";
+}
+
+/* ---------- mapas ---------- */
+const MAP_COLORS = {
+  dust2: "#c8a165", mirage: "#d9965b", inferno: "#c7503b", nuke: "#4f86c6", ancient: "#4f8f5f",
+  anubis: "#3aa0a0", train: "#8a8f98", cache: "#7d9a5a", overpass: "#6aa0c8", vertigo: "#9b7fd1",
+};
+function renderMaps() {
+  $("maps").innerHTML = MAPS.map((m) => {
+    const c = MAP_COLORS[m.map.toLowerCase()] || "var(--accent-mark)";
+    const team = (name, score) => '<div class="team' + (name === m.winner ? " win" : "") + '"><span class="tn">' + esc(name) +
+      (name === m.winner ? '<span class="wtag">venceu</span>' : "") + '</span><span class="ts display num">' + score + "</span></div>";
+    return '<div class="card map" style="--mc:' + c + '"><div class="mh"><div class="mname display">' + esc(m.map) +
+      '</div><div class="mdate">' + shortDate(m.date) + " · " + (m.score1 + m.score2) + " rounds</div></div>" +
+      '<div class="mb">' + team(m.team1, m.score1) + team(m.team2, m.score2) +
+      (m.mvp ? '<div class="mvp">' + icon("star") + "MVP <b>" + esc(m.mvp) + "</b> · " + m.mvp_kills + "/" + m.mvp_deaths + " · " + fmt(m.mvp_adr, 1) + " ADR</div>" : "") +
+      "</div></div>";
+  }).join("");
+}
+
+/* ---------- tudo ---------- */
+function renderAll() {
+  const list = visiblePlayers();
+  renderSeg();
+  renderPodium(list);
+  renderAwards(list);
+  renderScatter(list);
+  renderTable(list);
+}
+$("search").addEventListener("input", (e) => {
+  state.q = e.target.value.trim().toLowerCase();
+  const list = visiblePlayers();
+  renderTable(list);
+  renderScatter(list);
+});
+renderMaps();
+renderAll();
+</script>
+</body>
+</html>
