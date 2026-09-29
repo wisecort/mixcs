@@ -55,6 +55,46 @@ aparecer no topo com 2–3 mapas de sorte.
 
 **Tiers** (badge na tabela, pelo MixScore final): S ≥ 72 · A ≥ 65 · B ≥ 58 · C ≥ 50 · D abaixo.
 
+## Noites
+
+`split_nights()` junta os mapas em noites de mix: mais de 4h entre um mapa e o próximo começa
+outra noite. `night_label()` data a noite pelo início menos 6h (mapa às 00:56 do dia 26 é
+"noite de 25/09"). O seletor no topo da página troca entre "Todas as noites" e cada noite; cada
+noite é calculada à parte (`build_scope()`), inclusive MixScore, duplas e rivalidades.
+
+## Duplas, rivalidades, parceiro, freguês e carrasco
+
+`pair_stats()` olha a escalação de cada mapa:
+
+- **Dupla**: dois jogadores no mesmo time. Ranking por vitórias juntos (mínimo 3 jogos em todas
+  as noites, 2 numa noite só).
+- **Rivalidade**: dois jogadores em times opostos. Ranking pelo número de confrontos.
+- No perfil de cada jogador: **melhor parceiro** (mais vitórias juntos, 2+ jogos), **freguês**
+  (adversário que ele mais venceu) e **carrasco** (quem mais venceu ele), mínimo 2 confrontos.
+
+## Forma
+
+Calculada no JS (`enrich()`) a partir do histórico: últimos resultados (bolinhas V/D),
+sequência atual (positiva = vitórias, negativa = derrotas) e maior sequência de vitórias.
+
+## Montar times
+
+Seção logo depois da "Última noite". O dono marca quem vai jogar (e pode adicionar convidados
+que não estão no banco), e a página divide em dois times:
+
+- **Força** de cada jogador = MixScore (com peso de confiança) + 20 × (aproveitamento ajustado − 50%),
+  com aproveitamento ajustado = (vitórias + 2,5) / (mapas + 5). Sempre de **todas as noites**.
+  Convidado entra com a força mediana do mix.
+- **Equilibrar** testa todas as divisões possíveis (até 16 jogadores) e pega a de menor diferença de
+  força média. **Sortear outra** escolhe aleatoriamente entre as divisões até 1 ponto piores que a
+  melhor (no máximo 20), pra variar os times sem desequilibrar.
+- Veredito: < 1 ponto "muito equilibrado", < 2,5 "equilibrado", < 5 "um pouco desequilibrado".
+- **Copiar times** manda o texto pro clipboard (pra colar no grupo). A seleção fica salva no navegador
+  (`localStorage`, chave `mix-teams`).
+- Teste nos 21 mapas do banco (24–29/09): o time com maior força média venceu 16 de 21 (só MixScore:
+  15 de 21). É dentro da amostra — não é uma previsão calibrada; por isso a página mostra a parcela
+  de força e não "chance de vitória".
+
 ## Outras métricas
 
 | Métrica | Cálculo |
@@ -68,6 +108,21 @@ aparecer no topo com 2–3 mapas de sorte.
 | Rei do mapa (Top mapas) | maior ADR médio naquele mapa entre quem jogou 2+ vezes nele |
 | Destaques | melhor de cada métrica entre quem tem 100+ rounds (`--confianca`) |
 
+## Imagens dos mapas
+
+`assets/maps/<slug>.jpg`, 640×360, tiradas de
+[ghostcap-gaming/cs2-map-images](https://github.com/ghostcap-gaming/cs2-map-images)
+("map screenshots you can use for cs2 projects"). A lista dos que existem fica em `MAP_FILES`
+no JS; mapa sem imagem usa um degradê com a cor de `MAP_COLORS`. Pra adicionar um mapa novo
+(ex: `de_dust3`):
+
+```bash
+curl -sL -o /tmp/m.png https://raw.githubusercontent.com/ghostcap-gaming/cs2-map-images/main/cs2/de_dust3.png
+sips -s format jpeg -s formatOptions 72 --resampleWidth 640 /tmp/m.png --out assets/maps/dust3.jpg
+```
+
+e inclua `"dust3"` em `MAP_FILES` (e uma cor em `MAP_COLORS`).
+
 ## Estrutura do `matchzy_ranking.py`
 
 | Função | Faz |
@@ -75,13 +130,18 @@ aparecer no topo com 2–3 mapas de sorte.
 | `find_dbs()` | resolve os caminhos do `--db` (ou acha `./matchzy.db`) |
 | `load_maps()` | lê todos os bancos, filtra mapas completos, junta jogadores de cada mapa |
 | `fetch_players()` | agrega por `steamid64`, calcula métricas, MixScore, histórico e ordena |
-| `fetch_maps()` | monta os cards de mapa (placar, vencedor, MVP) |
-| `render_html()` | injeta o JSON (`@@PAYLOAD_JSON@@`) no `HTML_TEMPLATE` |
+| `fetch_maps()` | monta cada partida: placar, vencedor, MVP e o placar completo dos 10 jogadores (`board`) |
+| `pair_stats()` | duplas, rivalidades, melhor parceiro, freguês e carrasco |
+| `split_nights()` / `night_label()` | separa e nomeia as noites de mix |
+| `build_scope()` | calcula tudo pra um conjunto de mapas (todas as noites ou uma noite) |
+| `render_html()` | injeta o JSON (`@@PAYLOAD_JSON@@`, com `scopes`: todas as noites + cada noite) no `HTML_TEMPLATE` |
 | `HTML_TEMPLATE` | página inteira: CSS, HTML e JS |
 
-O JS da página renderiza tudo a partir do `PAYLOAD`: filtro "Todos / 3+ / 5+ / 10+ mapas"
-(recalcula pódio, destaques, gráfico e tabela), busca, ordenação por coluna, histórico ao
-clicar na linha, tema claro/escuro (salvo no `localStorage`).
+O JS da página renderiza tudo a partir do `PAYLOAD`: seletor de noite (`setScope()`), filtro
+"Todos / 3+ / 5+ / 10+ mapas" (recalcula pódio, destaques, forma, gráfico e tabela), busca,
+ordenação por coluna, tema claro/escuro (salvo no `localStorage`). Qualquer elemento com
+`data-player="<steamid>"` abre o perfil (`openPlayer()`); com `data-match="<id>"` abre o placar
+(`openMatch()`). Esc ou clique fora fecha.
 
 ## Mexer no visual
 

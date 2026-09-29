@@ -164,6 +164,8 @@ def fetch_players(maps: list[dict], min_rounds: int, confidence: int = 100) -> l
         on_team1 = r["team"] == m["team1_name"]
         p["history"].append(
             {
+                "mid": map_id(m),
+                "slug": map_slug(m["mapname"]),
                 "date": (m["start_time"] or "")[:16],
                 "map": map_label(m["mapname"]),
                 "won": won,
@@ -276,6 +278,15 @@ def team_label(raw: str) -> str:
     return " ".join(name.replace("_", " ").split()) or raw
 
 
+def map_slug(raw: str) -> str:
+    # "de_dust2" -> "dust2" (nome do arquivo em assets/maps/)
+    return (raw[3:] if raw.startswith(("de_", "cs_")) else raw).lower()
+
+
+def map_id(m: dict) -> str:
+    return "-".join(str(x) for x in m["key"])
+
+
 def map_label(raw: str) -> str:
     name = raw[3:] if raw.startswith(("de_", "cs_")) else raw
     return name.replace("_", " ").title()
@@ -284,11 +295,32 @@ def map_label(raw: str) -> str:
 def fetch_maps(maps: list[dict], current_names: dict[str, str]) -> list[dict]:
     result = []
     for m in maps:
+        rounds = max(m["rounds"], 1)
         # MVP do mapa = mais kills (desempate por dano)
         mvp = max(m["players"], key=lambda r: (r["kills"], r["damage"]), default=None)
+        board = {"team1": [], "team2": []}
+        for r in m["players"]:
+            side = "team1" if r["team"] == m["team1_name"] else "team2"
+            sid = str(r["steamid64"])
+            board[side].append(
+                {
+                    "sid": sid,
+                    "name": current_names.get(sid, r["name"]),
+                    "k": r["kills"],
+                    "d": r["deaths"],
+                    "a": r["assists"],
+                    "adr": round(r["damage"] / rounds, 1),
+                    "hs": round(r["head_shot_kills"] / r["kills"] * 100) if r["kills"] else 0,
+                    "mk": r["enemy3ks"] + r["enemy4ks"] + r["enemy5ks"],
+                }
+            )
+        for side in board.values():
+            side.sort(key=lambda x: (x["k"], x["adr"]), reverse=True)
         result.append(
             {
+                "id": map_id(m),
                 "map": map_label(m["mapname"]),
+                "slug": map_slug(m["mapname"]),
                 "date": (m["start_time"] or "")[:16],
                 "team1": team_label(m["team1_name"]) if m["team1_name"] else "Time 1",
                 "team2": team_label(m["team2_name"]) if m["team2_name"] else "Time 2",
@@ -297,13 +329,128 @@ def fetch_maps(maps: list[dict], current_names: dict[str, str]) -> list[dict]:
                 "winner": team_label(m["winner"]),
                 # nome mais recente do jogador, igual ao da tabela
                 "mvp": current_names.get(str(mvp["steamid64"]), mvp["name"]) if mvp else None,
+                "mvp_sid": str(mvp["steamid64"]) if mvp else None,
                 "mvp_kills": mvp["kills"] if mvp else 0,
                 "mvp_deaths": mvp["deaths"] if mvp else 0,
-                "mvp_adr": round(mvp["damage"] / max(m["rounds"], 1), 1) if mvp else 0,
+                "mvp_adr": round(mvp["damage"] / rounds, 1) if mvp else 0,
+                "board": board,
             }
         )
     result.sort(key=lambda x: x["date"], reverse=True)
     return result
+
+
+def pair_stats(maps: list[dict], players: list[dict], min_games: int) -> tuple[list[dict], list[dict]]:
+    """Duplas (mesmo time) e rivalidades (times opostos) entre os jogadores do ranking.
+
+    Também preenche em cada jogador: melhor parceiro, freguês (quem ele mais venceu)
+    e carrasco (quem mais venceu ele).
+    """
+    by_sid = {p["steamid64"]: p for p in players}
+    duos: dict[tuple, dict] = {}
+    rivals: dict[tuple, dict] = {}
+    for m in maps:
+        teams: dict[str, list[str]] = {}
+        for r in m["players"]:
+            sid = str(r["steamid64"])
+            if sid in by_sid:
+                teams.setdefault(r["team"], []).append(sid)
+        for team, sids in teams.items():
+            won = team == m["winner"]
+            for i, a in enumerate(sids):
+                for b in sids[i + 1 :]:
+                    key = tuple(sorted((a, b)))
+                    d = duos.setdefault(key, {"a": key[0], "b": key[1], "games": 0, "wins": 0})
+                    d["games"] += 1
+                    d["wins"] += won
+        names = list(teams)
+        if len(names) == 2:
+            t1, t2 = names
+            for a in teams[t1]:
+                for b in teams[t2]:
+                    key = tuple(sorted((a, b)))
+                    r = rivals.setdefault(key, {"a": key[0], "b": key[1], "games": 0, "a_wins": 0, "b_wins": 0})
+                    r["games"] += 1
+                    winner_sid = a if m["winner"] == t1 else b
+                    r["a_wins" if winner_sid == key[0] else "b_wins"] += 1
+
+    def name(sid: str) -> str:
+        return by_sid[sid]["name"]
+
+    for p in players:
+        sid = p["steamid64"]
+        mine = [d for d in duos.values() if sid in (d["a"], d["b"]) and d["games"] >= 2]
+        best = max(mine, key=lambda d: (d["wins"], d["wins"] / d["games"]), default=None)
+        p["partner"] = (
+            {"sid": best["b"] if best["a"] == sid else best["a"], "games": best["games"], "wins": best["wins"]}
+            if best and best["wins"]
+            else None
+        )
+        faced = [r for r in rivals.values() if sid in (r["a"], r["b"]) and r["games"] >= 2]
+
+        def wins_over(r: dict) -> tuple[int, int]:
+            mine_w = r["a_wins"] if r["a"] == sid else r["b_wins"]
+            return mine_w, r["games"] - mine_w
+
+        fregues = max(faced, key=lambda r: (wins_over(r)[0] - wins_over(r)[1], wins_over(r)[0]), default=None)
+        carrasco = max(faced, key=lambda r: (wins_over(r)[1] - wins_over(r)[0], wins_over(r)[1]), default=None)
+        p["fregues"] = None
+        p["carrasco"] = None
+        if fregues and wins_over(fregues)[0] > wins_over(fregues)[1]:
+            w, l = wins_over(fregues)
+            p["fregues"] = {"sid": fregues["b"] if fregues["a"] == sid else fregues["a"], "wins": w, "losses": l}
+        if carrasco and wins_over(carrasco)[1] > wins_over(carrasco)[0]:
+            w, l = wins_over(carrasco)
+            p["carrasco"] = {"sid": carrasco["b"] if carrasco["a"] == sid else carrasco["a"], "wins": w, "losses": l}
+        for k in ("partner", "fregues", "carrasco"):
+            if p[k]:
+                p[k]["name"] = name(p[k]["sid"])
+
+    top_duos = sorted(
+        (d for d in duos.values() if d["games"] >= min_games),
+        key=lambda d: (d["wins"], d["wins"] / d["games"], d["games"]),
+        reverse=True,
+    )[:8]
+    top_rivals = sorted(
+        (r for r in rivals.values() if r["games"] >= min_games),
+        key=lambda r: (r["games"], -abs(r["a_wins"] - r["b_wins"])),
+        reverse=True,
+    )[:8]
+    for d in top_duos:
+        d["a_name"], d["b_name"] = name(d["a"]), name(d["b"])
+    for r in top_rivals:
+        r["a_name"], r["b_name"] = name(r["a"]), name(r["b"])
+    return top_duos, top_rivals
+
+
+def split_nights(maps: list[dict], gap_hours: int = 4) -> list[list[dict]]:
+    """Agrupa os mapas em noites de mix: um intervalo de mais de `gap_hours` separa uma noite da outra."""
+    from datetime import datetime, timedelta
+
+    parse = lambda m: datetime.strptime(m["start_time"][:19], "%Y-%m-%d %H:%M:%S")
+    ordered = sorted((m for m in maps if m.get("start_time")), key=parse)
+    nights: list[list[dict]] = []
+    for m in ordered:
+        if nights and parse(m) - parse(nights[-1][-1]) <= timedelta(hours=gap_hours):
+            nights[-1].append(m)
+        else:
+            nights.append([m])
+    return nights
+
+
+def night_label(night: list[dict]) -> str:
+    from datetime import datetime, timedelta
+
+    # mapa começado de madrugada conta como a noite anterior
+    first = datetime.strptime(night[0]["start_time"][:19], "%Y-%m-%d %H:%M:%S") - timedelta(hours=6)
+    return first.strftime("%d/%m")
+
+
+def build_scope(maps: list[dict], min_rounds: int, confidence: int, min_pair_games: int) -> dict:
+    players = fetch_players(maps, min_rounds, confidence)
+    names = {p["steamid64"]: p["name"] for p in players}
+    duos, rivals = pair_stats(maps, players, min_pair_games)
+    return {"players": players, "maps": fetch_maps(maps, names), "duos": duos, "rivals": rivals}
 
 
 HTML_TEMPLATE = """<!doctype html>
@@ -708,8 +855,273 @@ HTML_TEMPLATE = """<!doctype html>
     .tm .mn { font-size: 20px; }
   }
 
+  /* ---------- montar times ---------- */
+  .builder { overflow: hidden; }
+  .bd-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .bd-top .search { width: 200px; padding-left: 12px; }
+  .bd-count { font-size: 13px; color: var(--text-2); }
+  .bd-count b { color: var(--accent); font-size: 15px; }
+  .bd-guest { display: flex; gap: 6px; margin-left: auto; }
+  .bd-guest input { width: 150px; }
+  .btn {
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; white-space: nowrap;
+    background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 10px; padding: 8px 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { color: var(--text); }
+  .btn svg.i { width: 15px; height: 15px; }
+  .btn.primary { background: var(--accent-mark); border-color: transparent; color: #17120a; }
+  .btn.primary:hover { filter: brightness(1.08); color: #17120a; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; max-height: 260px; overflow-y: auto; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-2);
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px 4px 4px; cursor: pointer;
+  }
+  .chip .avatar { width: 26px; height: 26px; font-size: 10px; border-radius: 50%; }
+  .chip small { font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .chip:hover { border-color: var(--border-strong); color: var(--text); }
+  .chip[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent-mark); color: var(--text); }
+  .chip[aria-pressed="true"] .avatar { background: var(--accent-mark); color: #17120a; }
+  .chip.guest { border-style: dashed; }
+  .bd-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface-2); }
+  .bd-actions .hint { font-size: 12px; color: var(--text-3); margin-left: auto; }
+  .bd-result { padding: 16px; border-top: 1px solid var(--border); }
+  .bd-result:empty { display: none; }
+  .balance { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .balance .side { font-size: 26px; font-weight: 700; }
+  .balance .meter { height: 10px; border-radius: 5px; background: var(--surface-3); position: relative; overflow: hidden; display: flex; gap: 2px; }
+  .balance .meter i { display: block; height: 100%; }
+  .balance .meter i.a { background: var(--accent-mark); border-radius: 5px 0 0 5px; }
+  .balance .meter i.b { background: var(--text-3); border-radius: 0 5px 5px 0; }
+  .verdict { text-align: center; font-size: 13px; color: var(--text-2); margin: -6px 0 14px; }
+  .verdict b { color: var(--text); }
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .teams { grid-template-columns: 1fr; } .bd-guest { margin-left: 0; } }
+  .team-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .team-card.a { box-shadow: inset 3px 0 0 var(--accent-mark); }
+  .team-card.b { box-shadow: inset 3px 0 0 var(--text-3); }
+  .team-card .th { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .team-card .th .nm { font-size: 20px; font-weight: 700; text-transform: uppercase; }
+  .team-card .th .st { margin-left: auto; font-size: 12px; color: var(--text-3); }
+  .team-card .th .st b { color: var(--text); font-size: 15px; }
+  .tp { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .tp:last-child { border-bottom: 0; }
+  .tp .avatar { width: 28px; height: 28px; font-size: 11px; border-radius: 8px; }
+  .tp .n { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tp .s { color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .tp .cap { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  .bd-msg { font-size: 13px; color: var(--text-3); padding: 4px 0; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); z-index: 70; background: var(--text); color: var(--bg); font-weight: 600; font-size: 13px; padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
   footer { margin: 56px 0 48px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 12px; line-height: 1.7; }
   footer b { color: var(--text-2); font-weight: 600; }
+
+  /* ---------- seletor de noite ---------- */
+  .select-wrap { position: relative; }
+  .select {
+    appearance: none; -webkit-appearance: none;
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px;
+    padding: 8px 32px 8px 34px; cursor: pointer;
+  }
+  .select:focus { outline: 2px solid var(--accent-mark); outline-offset: -1px; }
+  .select-wrap .cal { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--accent); pointer-events: none; }
+  .select-wrap .dn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-3); pointer-events: none; }
+
+  /* ---------- clicáveis ---------- */
+  .link { cursor: pointer; }
+  .link:hover { color: var(--accent); }
+  .pod, .award, .map, .ln-map, .tm, .duo-row, .riv-row { cursor: pointer; }
+  .pod:hover, .award:hover, .map:hover { border-color: var(--border-strong); }
+  .map { transition: transform .15s, border-color .15s; }
+  .map:hover { transform: translateY(-2px); }
+
+  /* ---------- imagem de mapa ---------- */
+  .mapimg { background-color: var(--surface-3); background-size: cover; background-position: center; }
+
+  /* ---------- última noite ---------- */
+  .lastnight { display: grid; grid-template-columns: minmax(260px, 0.9fr) 1.6fr; overflow: hidden; }
+  .ln-info { padding: 22px; display: flex; flex-direction: column; gap: 18px; border-right: 1px solid var(--border); }
+  .ln-title { font-size: 34px; font-weight: 800; text-transform: uppercase; line-height: 0.95; }
+  .ln-title span { color: var(--accent); }
+  .ln-sub { font-size: 13px; color: var(--text-3); margin-top: 6px; }
+  .ln-hl { display: flex; align-items: center; gap: 12px; }
+  .ln-hl .l { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .ln-hl .n { font-size: 16px; font-weight: 700; }
+  .ln-hl .h { font-size: 12px; color: var(--text-3); }
+  .ln-btn {
+    align-self: flex-start; font: inherit; font-size: 13px; font-weight: 600; color: var(--accent);
+    background: var(--accent-wash); border: 1px solid var(--accent-glow); border-radius: 10px; padding: 8px 14px; cursor: pointer;
+  }
+  .ln-btn:hover { background: var(--accent-glow); }
+  .ln-maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); gap: 10px; padding: 16px; align-content: start; }
+  .ln-map { position: relative; height: 112px; border-radius: 12px; overflow: hidden; color: #fff; }
+  .ln-map::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.8)); }
+  .ln-map > div { position: absolute; left: 12px; right: 12px; bottom: 10px; z-index: 1; }
+  .ln-map .nm { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; text-shadow: 0 1px 8px rgba(0,0,0,.5); }
+  .ln-map .sc { font-size: 13px; font-weight: 600; opacity: .95; }
+  .ln-map .sc b { color: #fbc15e; }
+  .ln-map:hover { outline: 2px solid var(--accent-mark); }
+  @media (max-width: 860px) { .lastnight { grid-template-columns: 1fr; } .ln-info { border-right: 0; border-bottom: 1px solid var(--border); } }
+
+  /* ---------- forma ---------- */
+  .pills { display: inline-flex; gap: 3px; }
+  .pill {
+    width: 18px; height: 18px; border-radius: 5px; display: inline-grid; place-items: center;
+    font-size: 10px; font-weight: 700; font-family: Inter, system-ui, sans-serif;
+  }
+  .pill.w { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+  .pill.l { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+  .pill.e { background: var(--surface-3); color: transparent; }
+  .forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+  .fcard { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .fcard .top { display: flex; align-items: center; gap: 12px; }
+  .fcard .ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+  .fcard.hot .ic { background: var(--accent-wash); color: var(--accent); }
+  .fcard.best .ic { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .fcard.cold .ic { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+  .fcard .l { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .fcard .n { font-size: 16px; font-weight: 700; }
+  .fcard .v { margin-left: auto; font-size: 34px; font-weight: 700; line-height: 1; text-align: right; }
+  .fcard .v small { display: block; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 500; color: var(--text-3); }
+  .fcard .none { font-size: 13px; color: var(--text-3); }
+
+  /* ---------- duplas e rivalidades ---------- */
+  .pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .pairs { grid-template-columns: 1fr; } }
+  .pairs .card { overflow: hidden; }
+  .pairs h3 { margin: 0; padding: 14px 18px; font-size: 20px; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .pairs h3 svg.i { color: var(--accent); }
+  .pairs h3 small { margin-left: auto; font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 500; color: var(--text-3); text-transform: none; }
+  .duo-row, .riv-row { display: grid; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); }
+  .duo-row:last-child, .riv-row:last-child { border-bottom: 0; }
+  .duo-row:hover, .riv-row:hover { background: var(--accent-wash); }
+  .duo-row { grid-template-columns: 22px auto 1fr auto; }
+  .duo-row .rk, .riv-row .rk { font-size: 18px; font-weight: 700; color: var(--text-3); }
+  .stack { display: flex; }
+  .stack .avatar { width: 30px; height: 30px; font-size: 11px; border-radius: 9px; box-shadow: 0 0 0 2px var(--surface); }
+  .stack .avatar + .avatar { margin-left: -8px; }
+  .duo-row .nm { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .duo-row .nm span { color: var(--text-3); font-weight: 400; margin: 0 4px; }
+  .duo-row .rec { text-align: right; font-weight: 700; white-space: nowrap; }
+  .duo-row .rec small { display: block; font-size: 11px; font-weight: 500; color: var(--text-3); }
+  .riv-row { grid-template-columns: 22px 1fr auto 1fr; }
+  .riv-row .a { text-align: right; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .riv-row .b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .riv-row .vs { text-align: center; font-size: 22px; font-weight: 700; white-space: nowrap; }
+  .riv-row .vs small { display: block; font-family: Inter, system-ui, sans-serif; font-size: 10px; font-weight: 500; color: var(--text-3); letter-spacing: 0.04em; }
+  .riv-row .lead { color: var(--accent); }
+  .pairs .none { padding: 24px 18px; color: var(--text-3); font-size: 13px; }
+
+  /* ---------- top mapas (thumb) ---------- */
+  .tm .mn .thumb { width: 64px; height: 36px; border-radius: 7px; flex: none; }
+  .tm:hover { filter: brightness(1.06); }
+
+  /* ---------- cards de partida com imagem ---------- */
+  .map .mh.mapimg { background-image: var(--img); min-height: 104px; display: flex; flex-direction: column; justify-content: flex-end; color: #fff; border-bottom: 0; }
+  .map .mh.mapimg::after { content: ""; position: absolute; inset: 0; opacity: 1; mask-image: none; -webkit-mask-image: none; background: linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.78)); }
+  .map .mh.mapimg .mname, .map .mh.mapimg .mdate { z-index: 1; color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.45); }
+  .map .mh.mapimg .mdate { opacity: .9; }
+
+  /* ---------- painel do jogador ---------- */
+  body.locked { overflow: hidden; }
+  .overlay { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,0.55); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .overlay.on { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; z-index: 50; height: 100%; width: min(600px, 100%);
+    background: var(--bg); border-left: 1px solid var(--border-strong); overflow-y: auto;
+    transform: translateX(102%); transition: transform .25s ease; box-shadow: -20px 0 60px rgba(0,0,0,0.35);
+  }
+  .drawer.on { transform: none; }
+  .dr-head {
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 14px; padding: 18px 20px;
+    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .dr-head .avatar { width: 52px; height: 52px; font-size: 18px; border-radius: 14px; background: var(--accent-wash); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-glow); }
+  .dr-head .nm { font-size: 24px; font-weight: 700; line-height: 1.1; display: flex; align-items: center; gap: 8px; }
+  .dr-head .sub2 { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+  .x {
+    margin-left: auto; flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+    background: var(--surface); border: 1px solid var(--border-strong); color: var(--text-2); cursor: pointer;
+  }
+  .x:hover { color: var(--text); }
+  .dr-body { padding: 18px 20px 40px; display: flex; flex-direction: column; gap: 22px; }
+  .dr-sec h4 { margin: 0 0 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-size: 16px; }
+  .dgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  @media (max-width: 520px) { .dgrid { grid-template-columns: repeat(2, 1fr); } }
+  .dcell { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+  .dcell .l { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .dcell .v { font-size: 24px; font-weight: 700; margin-top: 2px; line-height: 1.1; }
+  .dcell .s { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .formline { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--text-2); }
+  .formline b { color: var(--text); }
+  .rels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  @media (max-width: 520px) { .rels { grid-template-columns: 1fr; } }
+  .rel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+  .rel .l { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .rel .n { font-weight: 700; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rel .s { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+  .rel.none .n { color: var(--text-3); font-weight: 500; }
+  .permap, .matches { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .pm-row, .mt-row { display: grid; align-items: center; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pm-row:last-child, .mt-row:last-child { border-bottom: 0; }
+  .pm-row { grid-template-columns: 56px 1fr 44px 64px 56px 48px; color: var(--text-2); }
+  .pm-row.head, .mt-row.head { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); padding-top: 7px; padding-bottom: 7px; }
+  .pm-row .thumb, .mt-row .thumb { width: 56px; height: 32px; border-radius: 6px; }
+  .pm-row .mn, .mt-row .mn { font-weight: 700; color: var(--text); font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-size: 17px; text-transform: uppercase; }
+  .pm-row > span:not(.mn):not(.thumb):not(.mn-h), .mt-row > span.r { text-align: right; }
+  .mt-row { grid-template-columns: 56px 1fr 24px 56px 70px 48px 16px; color: var(--text-2); cursor: pointer; }
+  .mt-row:not(.head):hover { background: var(--accent-wash); }
+  .mt-row .dt { font-size: 11px; color: var(--text-3); font-family: Inter, system-ui, sans-serif; font-weight: 400; text-transform: none; }
+  .mt-row .kda { color: var(--text); font-weight: 600; }
+  .mt-row svg.i { width: 14px; height: 14px; color: var(--text-3); }
+  @media (max-width: 520px) {
+    .pm-row { grid-template-columns: 48px 1fr 60px 50px; }
+    .pm-row > :nth-child(3), .pm-row > :nth-child(6) { display: none; }
+    .mt-row { grid-template-columns: 48px 1fr 22px 60px 14px; }
+    .mt-row > :nth-child(4), .mt-row > :nth-child(6) { display: none; }
+    .pm-row .thumb, .mt-row .thumb { width: 48px; height: 28px; }
+  }
+
+  /* ---------- placar da partida ---------- */
+  .modal-wrap { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; padding: 16px; background: rgba(0,0,0,0.6); }
+  .modal-wrap.on { display: grid; }
+  .modal { width: min(880px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 18px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+  .banner { position: relative; min-height: 200px; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px 20px; color: #fff; }
+  .banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.85)); }
+  .banner > * { position: relative; z-index: 1; }
+  .banner .x { position: absolute; top: 14px; right: 14px; z-index: 2; background: rgba(0,0,0,0.45); border-color: rgba(255,255,255,0.2); color: #fff; }
+  .banner .bm { font-size: 13px; font-weight: 600; opacity: .9; }
+  .banner .bn { font-size: 44px; font-weight: 800; text-transform: uppercase; line-height: 0.95; }
+  .banner .bscore { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-top: 14px; }
+  .banner .bt { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .75; }
+  .banner .bt.win { opacity: 1; }
+  .banner .bt.r { text-align: right; }
+  .banner .bs { font-size: 52px; font-weight: 800; line-height: 1; white-space: nowrap; }
+  .banner .bs .w { color: #fbc15e; }
+  .banner .bs .lo { opacity: .7; }
+  .banner .bs i { font-style: normal; opacity: .5; margin: 0 8px; font-weight: 500; }
+  .boards { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 16px 18px 22px; }
+  .board { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .board .bh { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  .board .bh .tag { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); background: var(--accent-wash); border-radius: 6px; padding: 3px 7px; }
+  .board .bh .tag.l { color: var(--text-3); background: var(--surface-3); }
+  .board .bh .sc { margin-left: auto; font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-size: 26px; }
+  .board.win { box-shadow: inset 3px 0 0 var(--accent); }
+  .board table td, .board table th { padding: 8px 12px; font-size: 13px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-2); }
+  .board table th { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); }
+  .board table tr:last-child td { border-bottom: 0; }
+  .board td.pl, .board th.pl { text-align: left; }
+  .board td.pl { color: var(--text); font-weight: 600; }
+  .board td.pl svg.i { width: 13px; height: 13px; color: var(--accent); vertical-align: -1px; margin-left: 4px; }
+  .board .scroll { overflow-x: auto; }
+  .board table { width: 100%; min-width: 520px; table-layout: fixed; }
+  .board th.pl { width: 34%; }
+  .board td.pl { overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 560px) { .banner .bn { font-size: 34px; } .banner .bs { font-size: 38px; } }
 </style>
 </head>
 <body>
@@ -731,7 +1143,11 @@ HTML_TEMPLATE = """<!doctype html>
 
 <div class="filterbar">
   <div class="wrap">
-    <span class="lbl">Mostrar quem jogou</span>
+    <div class="select-wrap">
+      <svg class="i cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      <select class="select" id="scope" aria-label="Escolher noite"></select>
+      <svg class="i dn" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
     <div class="seg" id="seg" role="group" aria-label="Mínimo de mapas"></div>
     <div class="search-wrap">
       <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -741,8 +1157,38 @@ HTML_TEMPLATE = """<!doctype html>
 </div>
 
 <main class="wrap">
+  <section class="block" id="lastnight-sec">
+    <div class="card lastnight" id="lastnight"></div>
+  </section>
+
+  <section class="block" id="teams-sec">
+    <div class="sec-head">
+      <h2 class="display">Montar times <small>marque quem vai jogar e equilibre</small></h2>
+      <span class="note">força = MixScore + aproveitamento, de todas as noites</span>
+    </div>
+    <div class="card builder">
+      <div class="bd-top">
+        <input class="search" id="bd-search" type="search" placeholder="Filtrar jogadores" aria-label="Filtrar jogadores" />
+        <span class="bd-count" id="bd-count"></span>
+        <div class="bd-guest">
+          <input class="search" id="bd-guest" type="text" placeholder="Convidado (nome)" aria-label="Nome do convidado" maxlength="24" />
+          <button class="btn" type="button" id="bd-add">+ Adicionar</button>
+        </div>
+      </div>
+      <div class="chips" id="bd-chips"></div>
+      <div class="bd-actions">
+        <button class="btn primary" type="button" id="bd-balance">⚖ Equilibrar</button>
+        <button class="btn" type="button" id="bd-shuffle">↻ Sortear outra</button>
+        <button class="btn" type="button" id="bd-copy">Copiar times</button>
+        <button class="btn" type="button" id="bd-clear">Limpar</button>
+        <span class="hint" id="bd-hint"></span>
+      </div>
+      <div class="bd-result" id="bd-result"></div>
+    </div>
+  </section>
+
   <section class="block">
-    <div class="sec-head"><h2 class="display">Pódio</h2><span class="note" id="podium-note"></span></div>
+    <div class="sec-head"><h2 class="display">Pódio <small>por vitórias</small></h2><span class="note" id="podium-note"></span></div>
     <div class="podium" id="podium"></div>
   </section>
 
@@ -752,16 +1198,26 @@ HTML_TEMPLATE = """<!doctype html>
   </section>
 
   <section class="block">
+    <div class="sec-head"><h2 class="display">Forma <small>sequências de vitórias e derrotas</small></h2></div>
+    <div class="forms" id="forms"></div>
+  </section>
+
+  <section class="block">
     <div class="sec-head">
-      <h2 class="display">Top mapas <small>os mais jogados do mix</small></h2>
+      <h2 class="display">Top mapas <small>os mais jogados</small></h2>
       <span class="note">rei do mapa = maior ADR médio com 2+ jogos no mapa</span>
     </div>
     <div class="card topmaps" id="topmaps"></div>
   </section>
 
   <section class="block">
+    <div class="sec-head"><h2 class="display">Duplas e rivalidades</h2><span class="note" id="pairs-note"></span></div>
+    <div class="pairs" id="pairs"></div>
+  </section>
+
+  <section class="block">
     <div class="sec-head">
-      <h2 class="display">Dano × K/D <small>cada ponto é um jogador · passe o mouse</small></h2>
+      <h2 class="display">Dano × K/D <small>cada ponto é um jogador · clique pra abrir o perfil</small></h2>
     </div>
     <div class="card chart-card">
       <div class="chart-legend">
@@ -775,7 +1231,7 @@ HTML_TEMPLATE = """<!doctype html>
   <section class="block">
     <div class="sec-head">
       <h2 class="display">Classificação <small id="count"></small></h2>
-      <span class="note">clique num jogador pra ver o histórico</span>
+      <span class="note">clique num jogador pra ver as partidas dele</span>
     </div>
     <div class="card table-card">
       <div class="table-scroll">
@@ -788,17 +1244,27 @@ HTML_TEMPLATE = """<!doctype html>
   </section>
 
   <section class="block">
-    <div class="sec-head"><h2 class="display">Mapas jogados <small id="maps-count"></small></h2></div>
+    <div class="sec-head"><h2 class="display">Partidas <small id="maps-count"></small></h2><span class="note">clique pra ver o placar completo</span></div>
     <div class="maps" id="maps"></div>
   </section>
 
   <footer id="footer"></footer>
 </main>
 
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Perfil do jogador"></aside>
+<div class="modal-wrap" id="modal-wrap"><div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Placar da partida"></div></div>
+
 <script>
 const PAYLOAD = @@PAYLOAD_JSON@@;
-const ALL = PAYLOAD.players;
-const MAPS = PAYLOAD.maps;
+const SCOPES = PAYLOAD.scopes;
+const ALL_MAPS = {};
+SCOPES[0].maps.forEach((m) => { ALL_MAPS[m.id] = m; });
+const MAP_FILES = ["ancient", "anubis", "cache", "dust2", "inferno", "mirage", "nuke", "overpass", "train", "vertigo"];
+const MAP_COLORS = {
+  dust2: "#c8a165", mirage: "#d9965b", inferno: "#c7503b", nuke: "#4f86c6", ancient: "#4f8f5f",
+  anubis: "#3aa0a0", train: "#8a8f98", cache: "#7d9a5a", overpass: "#6aa0c8", vertigo: "#9b7fd1",
+};
 
 const ICONS = {
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
@@ -808,10 +1274,15 @@ const ICONS = {
   shield: '<path d="M12 3l8 3v6c0 4.5-3.5 8-8 9-4.5-1-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
   zap: '<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>',
   star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z"/>',
-  chev: '<path d="M6 9l6 6 6-6"/>',
+  chevr: '<path d="M9 6l6 6-6 6"/>',
   medal: '<circle cx="12" cy="15" r="6"/><path d="M8.5 10.2L6 3h4l2 4 2-4h4l-2.5 7.2"/>',
+  up: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
+  down: '<path d="M3 7l6 6 4-4 8 8M15 17h6v-6"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>',
+  swords: '<path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5L14 2h3v3l-4.5 4.5M5 14l-2 2 3 3 2-2"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
 };
-const icon = (n) => '<svg class="i" viewBox="0 0 24 24">' + ICONS[n] + '</svg>';
+const icon = (n) => '<svg class="i" viewBox="0 0 24 24">' + ICONS[n] + "</svg>";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const fmt = (v, d = 0) => Number(v).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -825,6 +1296,21 @@ const initials = (name) => {
 };
 const tierOf = (r) => (r >= 72 ? "S" : r >= 65 ? "A" : r >= 58 ? "B" : r >= 50 ? "C" : "D");
 const shortDate = (d) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) + " " + d.slice(11, 16) : "");
+const dayOf = (d) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
+const mapBg = (slug) => {
+  const c = MAP_COLORS[slug] || "var(--accent-mark)";
+  return MAP_FILES.includes(slug)
+    ? "background-color:" + c + ";background-image:url(assets/maps/" + slug + ".jpg)"
+    : "background-image:linear-gradient(135deg," + c + ",var(--surface-3))";
+};
+const thumb = (slug) => '<span class="thumb mapimg" style="' + mapBg(slug) + '"></span>';
+const pills = (hist, n) => {
+  const last = hist.slice(0, n).reverse();
+  const pad = Array(Math.max(0, n - last.length)).fill('<span class="pill e"></span>');
+  return '<span class="pills" title="últimos resultados, do mais antigo pro mais recente">' + pad.join("") +
+    last.map((h) => '<span class="pill ' + (h.won ? "w" : "l") + '">' + (h.won ? "V" : "D") + "</span>").join("") + "</span>";
+};
+const playerLink = (sid, name) => '<span class="link" data-player="' + esc(sid) + '">' + esc(name) + "</span>";
 
 /* ---------- tema ---------- */
 (function () {
@@ -841,35 +1327,36 @@ const shortDate = (d) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) + " " + d.sli
   });
 })();
 
-/* ---------- cabeçalho ---------- */
-const totalRounds = MAPS.reduce((s, m) => s + m.score1 + m.score2, 0);
-const totalKills = ALL.reduce((s, p) => s + p.kills, 0);
-const totalHs = ALL.reduce((s, p) => s + p.kills * p.hs_pct / 100, 0);
-$("hero-sub").innerHTML =
-  "<b>" + esc(PAYLOAD.period || "") + "</b> · só mapas finalizados " + PAYLOAD.teamSize + "x" + PAYLOAD.teamSize +
-  " · fonte: " + esc(PAYLOAD.sources);
-$("kpis").innerHTML = [
-  ["Mapas", fmt(MAPS.length)],
-  ["Rounds", fmt(totalRounds)],
-  ["Jogadores", fmt(ALL.length)],
-  ["Kills", fmt(totalKills)],
-  ["Headshot", fmt(totalKills ? (totalHs / totalKills) * 100 : 0, 1) + "%"],
-].map(([l, v]) => '<div class="kpi"><div class="l">' + l + '</div><div class="v display num">' + v + "</div></div>").join("");
-$("maps-count").textContent = plural(MAPS.length, "mapa", "mapas");
-$("footer").innerHTML =
-  "<b>Como ler.</b> Só entram mapas finalizados em que os dois times estavam completos; espectadores são ignorados. " +
-  "<b>Ranking</b> ordenado por vitórias; empate é decidido pelo aproveitamento (% de vitórias) e depois pelo MixScore. " +
-  "<b>MixScore</b> combina kills por round, ADR, HS%, clutch% e K/D numa nota só (a <b>nota bruta</b>) e depois aplica um peso de confiança: " +
-  "quem jogou poucos rounds fica puxado pra média do mix e vai ganhando a própria nota conforme joga " +
-  "(com " + PAYLOAD.confidence + " rounds, fica no meio do caminho). Assim ninguém chega ao topo com 2 ou 3 mapas de sorte. " +
-  "A nota bruta aparece no histórico de cada jogador e no gráfico. " +
-  "<b>Tiers</b>: S ≥ 72 · A ≥ 65 · B ≥ 58 · C ≥ 50 · D abaixo disso. " +
-  "Jogadores com menos de " + PAYLOAD.minRounds + " rounds não aparecem.";
+/* ---------- escopo (todas as noites ou uma noite) ---------- */
+let S, ALL, MAPS, BYSID, MAX_WINS, FILTERS;
+const state = { minMaps: 1, q: "", sortKey: "rank", sortDir: 1 };
 
-/* ---------- estado ---------- */
-const state = { minMaps: 1, q: "", sortKey: "rank", sortDir: 1, open: null };
-const MAX_WINS = Math.max(...ALL.map((p) => p.wins), 1);
-const FILTERS = [1, 3, 5, 10].filter((n) => n === 1 || ALL.filter((p) => p.matches >= n).length >= 3);
+function enrich(p) {
+  // histórico vem do mais recente pro mais antigo
+  const h = p.history;
+  let streak = 0;
+  if (h.length) {
+    const first = h[0].won;
+    for (const x of h) { if (x.won !== first) break; streak += 1; }
+    if (!first) streak = -streak;
+  }
+  let best = 0, run = 0;
+  h.slice().reverse().forEach((x) => { run = x.won ? run + 1 : 0; best = Math.max(best, run); });
+  return Object.assign({}, p, { streak, best_streak: best });
+}
+
+function setScope(id) {
+  S = SCOPES.find((s) => s.id === id) || SCOPES[0];
+  ALL = S.players.map(enrich);
+  MAPS = S.maps;
+  BYSID = {};
+  ALL.forEach((p) => { BYSID[p.steamid64] = p; });
+  MAX_WINS = Math.max(...ALL.map((p) => p.wins), 1);
+  FILTERS = [1, 3, 5, 10].filter((n) => n === 1 || ALL.filter((p) => p.matches >= n).length >= 3);
+  if (!FILTERS.includes(state.minMaps)) state.minMaps = 1;
+  $("scope").value = S.id;
+  renderScope();
+}
 
 function visiblePlayers() {
   return ALL.filter((p) => p.matches >= state.minMaps)
@@ -878,24 +1365,75 @@ function visiblePlayers() {
     .map((p, i) => Object.assign({}, p, { rank: i + 1 }));
 }
 
+$("scope").innerHTML = SCOPES.map((s) =>
+  '<option value="' + s.id + '">' + esc(s.label) + " · " + plural(s.maps.length, "mapa", "mapas") + "</option>").join("");
+$("scope").addEventListener("change", (e) => { setScope(e.target.value); window.scrollTo({ top: 0, behavior: "smooth" }); });
+
+/* ---------- cabeçalho ---------- */
+function renderHeader() {
+  const totalRounds = MAPS.reduce((s, m) => s + m.score1 + m.score2, 0);
+  const totalKills = ALL.reduce((s, p) => s + p.kills, 0);
+  const totalHs = ALL.reduce((s, p) => s + p.kills * p.hs_pct / 100, 0);
+  const nights = SCOPES.length - 1;
+  $("hero-sub").innerHTML = S.id === "all"
+    ? "<b>" + esc(S.period) + "</b> · " + plural(nights, "noite", "noites") + " de mix · só mapas finalizados " + PAYLOAD.teamSize + "x" + PAYLOAD.teamSize + " · fonte: " + esc(PAYLOAD.sources)
+    : "<b>" + esc(S.label) + "</b> · só mapas finalizados " + PAYLOAD.teamSize + "x" + PAYLOAD.teamSize + " · fonte: " + esc(PAYLOAD.sources);
+  $("kpis").innerHTML = [
+    ["Mapas", fmt(MAPS.length)],
+    ["Rounds", fmt(totalRounds)],
+    ["Jogadores", fmt(ALL.length)],
+    ["Kills", fmt(totalKills)],
+    ["Headshot", fmt(totalKills ? (totalHs / totalKills) * 100 : 0, 1) + "%"],
+  ].map(([l, v]) => '<div class="kpi"><div class="l">' + l + '</div><div class="v display num">' + v + "</div></div>").join("");
+  $("maps-count").textContent = plural(MAPS.length, "mapa", "mapas");
+}
+
 function renderSeg() {
   $("seg").innerHTML = FILTERS.map((n) =>
     '<button type="button" data-n="' + n + '" aria-pressed="' + (state.minMaps === n) + '">' +
     (n === 1 ? "Todos" : n + "+ mapas") + "</button>").join("");
   $("seg").querySelectorAll("button").forEach((b) =>
-    b.addEventListener("click", () => { state.minMaps = Number(b.dataset.n); state.open = null; renderAll(); }));
+    b.addEventListener("click", () => { state.minMaps = Number(b.dataset.n); renderAll(); }));
+}
+
+/* ---------- última noite ---------- */
+function renderLastNight() {
+  const sec = $("lastnight-sec");
+  const N = SCOPES[1];
+  if (S.id !== "all" || !N) { sec.style.display = "none"; return; }
+  sec.style.display = "";
+  const ps = N.players;
+  const pool = ps.filter((p) => p.matches >= 2);
+  const src = pool.length ? pool : ps;
+  const mvp = src.reduce((a, b) => (!a || b.raw_rating > a.raw_rating ? b : a), null);
+  const top = ps.slice().sort((a, b) => b.wins - a.wins || b.win_pct - a.win_pct)[0];
+  const hl = (lbl, ic, p, hint) => p ? '<div class="ln-hl"><div class="avatar">' + esc(initials(p.name)) + "</div><div>" +
+    '<div class="l">' + lbl + '</div><div class="n">' + playerLink(p.steamid64, p.name) + '</div><div class="h">' + hint + "</div></div></div>" : "";
+  const maps = N.maps.slice().reverse();
+  $("lastnight").innerHTML =
+    '<div class="ln-info"><div><div class="ln-title display">Última noite <span>' + esc(N.period) + "</span></div>" +
+    '<div class="ln-sub">' + plural(maps.length, "mapa", "mapas") + " · " + plural(ps.length, "jogador", "jogadores") + "</div></div>" +
+    hl("MVP da noite", "star", mvp, mvp ? "nota " + fmt(mvp.raw_rating, 1) + " · " + fmt(mvp.adr, 1) + " ADR · K/D " + fmt(mvp.kd, 2) : "") +
+    hl("Mais vitórias", "trophy", top, top ? top.wins + "V " + top.losses + "D na noite" : "") +
+    '<button class="ln-btn" type="button" id="ln-go">Ver só essa noite →</button></div>' +
+    '<div class="ln-maps">' + maps.map((m) => {
+      const w1 = m.winner === m.team1;
+      return '<div class="ln-map mapimg" data-match="' + m.id + '" style="' + mapBg(m.slug) + '"><div>' +
+        '<div class="nm display">' + esc(m.map) + '</div><div class="sc num">' +
+        (w1 ? "<b>" + m.score1 + "</b>–" + m.score2 : m.score1 + "–<b>" + m.score2 + "</b>") + " · " + esc(m.winner) + "</div></div></div>";
+    }).join("") + "</div>";
+  $("ln-go").addEventListener("click", () => setScope(N.id));
 }
 
 /* ---------- pódio ---------- */
 function renderPodium(list) {
   const top = list.slice(0, 3);
   $("podium-note").textContent = state.minMaps > 1 ? "entre quem jogou " + state.minMaps + "+ mapas" : "";
-  const order = [1, 0, 2];
-  $("podium").innerHTML = order.map((i) => {
+  $("podium").innerHTML = [1, 0, 2].map((i) => {
     const p = top[i];
     if (!p) return "<div></div>";
     const stats = [["MixScore", fmt(p.rating, 1)], ["K/D", fmt(p.kd, 2)], ["ADR", fmt(p.adr, 1)], ["HS", fmt(p.hs_pct, 0) + "%"]];
-    return '<div class="card pod p' + (i + 1) + '">' +
+    return '<div class="card pod p' + (i + 1) + '" data-player="' + p.steamid64 + '">' +
       '<div class="ghost display">' + (i + 1) + "</div>" +
       '<div class="place">' + icon("medal") + (i + 1) + "º lugar</div>" +
       '<div class="who"><div class="avatar">' + esc(initials(p.name)) + '</div><div style="min-width:0">' +
@@ -910,10 +1448,11 @@ function renderPodium(list) {
 
 /* ---------- destaques ---------- */
 function renderAwards(list) {
-  // destaques só entre quem já jogou o suficiente (mesmo peso de confiança do MixScore)
-  const pool = list.filter((p) => p.rounds >= PAYLOAD.confidence);
+  // em "todas as noites", só entre quem já jogou o suficiente (mesmo peso de confiança do MixScore)
+  const need = S.id === "all" ? PAYLOAD.confidence : 0;
+  const pool = list.filter((p) => p.rounds >= need);
   const src = pool.length >= 3 ? pool : list;
-  $("awards-note").textContent = src === pool ? "entre quem jogou " + PAYLOAD.confidence + "+ rounds" : "";
+  $("awards-note").textContent = need && src === pool ? "entre quem jogou " + need + "+ rounds" : "";
   const best = (key) => src.reduce((a, b) => (!a || b[key] > a[key] ? b : a), null);
   const defs = [
     { l: "Melhor aproveitamento", k: "win_pct", ic: "trophy", v: (p) => fmt(p.win_pct, 0) + "%", h: (p) => p.wins + " vitórias em " + plural(p.matches, "mapa", "mapas") },
@@ -926,10 +1465,50 @@ function renderAwards(list) {
   $("awards").innerHTML = defs.map((d) => {
     const p = best(d.k);
     if (!p) return "";
-    return '<div class="card award"><div class="ic">' + icon(d.ic) + '</div><div class="body">' +
+    return '<div class="card award" data-player="' + p.steamid64 + '"><div class="ic">' + icon(d.ic) + '</div><div class="body">' +
       '<div class="l">' + d.l + '</div><div class="pname">' + esc(p.name) + '</div><div class="hint">' + d.h(p) + "</div></div>" +
       '<div class="v display num">' + d.v(p) + "</div></div>";
   }).join("");
+}
+
+/* ---------- forma ---------- */
+function renderForms(list) {
+  const hot = list.filter((p) => p.streak >= 2).sort((a, b) => b.streak - a.streak || b.wins - a.wins)[0];
+  const best = list.filter((p) => p.best_streak >= 2).sort((a, b) => b.best_streak - a.best_streak || b.wins - a.wins)[0];
+  const cold = list.filter((p) => p.streak <= -2).sort((a, b) => a.streak - b.streak || a.wins - b.wins)[0];
+  const card = (cls, ic, lbl, p, val, sub, empty) => '<div class="card fcard ' + cls + '"' + (p ? ' data-player="' + p.steamid64 + '"' : "") + ">" +
+    '<div class="top"><div class="ic">' + icon(ic) + '</div><div><div class="l">' + lbl + "</div>" +
+    (p ? '<div class="n">' + esc(p.name) + "</div>" : '<div class="none">' + empty + "</div>") + "</div>" +
+    (p ? '<div class="v display num">' + val + "<small>" + sub + "</small></div>" : "") + "</div>" +
+    (p ? pills(p.history, 10) : "") + "</div>";
+  $("forms").innerHTML =
+    card("hot", "flame", "On fire · sequência atual", hot, hot && hot.streak, "vitórias seguidas", "ninguém com 2+ vitórias seguidas agora") +
+    card("best", "up", "Maior sequência", best, best && best.best_streak, "vitórias seguidas", "sem sequências ainda") +
+    card("cold", "down", "Na seca · sequência atual", cold, cold && -cold.streak, "derrotas seguidas", "ninguém com 2+ derrotas seguidas");
+}
+
+/* ---------- duplas e rivalidades ---------- */
+function renderPairs() {
+  const duos = S.duos || [], rivals = S.rivals || [];
+  const minG = S.id === "all" ? 3 : 2;
+  $("pairs-note").textContent = "mínimo de " + minG + " jogos juntos / contra";
+  const duoHtml = duos.length ? duos.map((d, i) =>
+    '<div class="duo-row" data-player="' + d.a + '"><span class="rk display num">' + (i + 1) + "</span>" +
+    '<span class="stack"><span class="avatar">' + esc(initials(d.a_name)) + '</span><span class="avatar">' + esc(initials(d.b_name)) + "</span></span>" +
+    '<span class="nm">' + playerLink(d.a, d.a_name) + "<span>+</span>" + playerLink(d.b, d.b_name) + "</span>" +
+    '<span class="rec num">' + d.wins + "V " + (d.games - d.wins) + "D<small>" + fmt((d.wins / d.games) * 100, 0) + "% em " + plural(d.games, "jogo", "jogos") + "</small></span></div>"
+  ).join("") : '<div class="none">Nenhuma dupla com ' + minG + "+ jogos juntos.</div>";
+  const rivHtml = rivals.length ? rivals.map((r, i) => {
+    const aLead = r.a_wins > r.b_wins, bLead = r.b_wins > r.a_wins;
+    return '<div class="riv-row" data-player="' + r.a + '"><span class="rk display num">' + (i + 1) + "</span>" +
+      '<span class="a">' + playerLink(r.a, r.a_name) + "</span>" +
+      '<span class="vs display num"><span class="' + (aLead ? "lead" : "") + '">' + r.a_wins + '</span> × <span class="' + (bLead ? "lead" : "") + '">' + r.b_wins +
+      "</span><small>" + plural(r.games, "confronto", "confrontos") + "</small></span>" +
+      '<span class="b">' + playerLink(r.b, r.b_name) + "</span></div>";
+  }).join("") : '<div class="none">Nenhum confronto com ' + minG + "+ jogos.</div>";
+  $("pairs").innerHTML =
+    '<div class="card"><h3 class="display">' + icon("users") + "Duplas que mais ganham<small>mesmo time</small></h3>" + duoHtml + "</div>" +
+    '<div class="card"><h3 class="display">' + icon("swords") + "Rivalidades<small>times opostos</small></h3>" + rivHtml + "</div>";
 }
 
 /* ---------- scatter ADR × K/D ---------- */
@@ -974,12 +1553,11 @@ function renderScatter(list) {
   const q = state.q;
   const pts = list.slice().sort((a, b) => b.matches - a.matches).map((p) => {
     const match = !q || p.name.toLowerCase().includes(q);
-    return '<circle class="pt' + (q && !match ? " dim" : "") + (q && match ? " hl" : "") + '" data-id="' + p.steamid64 + '" cx="' + sx(p.adr) + '" cy="' + sy(p.kd) + '" r="' + rad(p) + '" />';
+    return '<circle class="pt' + (q && !match ? " dim" : "") + (q && match ? " hl" : "") + '" cx="' + sx(p.adr) + '" cy="' + sy(p.kd) + '" r="' + rad(p) + '" />';
   }).join("");
 
-  // rótulos só pros 5 primeiros do ranking (e pra quem bate na busca)
+  // rótulos: top 5 do ranking (e quem bate na busca), no primeiro lugar livre
   const labeled = list.filter((p) => p.rank <= 5 || (q && p.name.toLowerCase().includes(q)));
-  // posiciona cada rótulo no primeiro lugar livre (direita, esquerda, acima, abaixo)
   const placed = [];
   const hits = (b) => placed.some((o) => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y) ||
     list.some((p) => { const cx = sx(p.adr), cy = sy(p.kd), r = rad(p);
@@ -1008,7 +1586,7 @@ function renderScatter(list) {
   box.insertAdjacentHTML("afterbegin", svg);
   const svgEl = box.querySelector("svg");
   const ring = svgEl.querySelector("#hover-ring");
-
+  let hover = null;
   const move = (ev) => {
     const rect = svgEl.getBoundingClientRect();
     const px = ((ev.clientX - rect.left) / rect.width) * W;
@@ -1018,20 +1596,23 @@ function renderScatter(list) {
       const d = (sx(p.adr) - px) ** 2 + (sy(p.kd) - py) ** 2;
       if (d < bestD) { bestD = d; bestP = p; }
     });
+    hover = bestP;
+    svgEl.style.cursor = bestP ? "pointer" : "default";
     if (!bestP) { tip.classList.remove("on"); ring.setAttribute("r", 0); return; }
     ring.setAttribute("cx", sx(bestP.adr)); ring.setAttribute("cy", sy(bestP.kd)); ring.setAttribute("r", rad(bestP) + 3);
     tip.innerHTML = '<div class="t">#' + bestP.rank + " " + esc(bestP.name) + "</div>" +
-      [["MixScore", fmt(bestP.rating, 1)], ["Nota bruta", fmt(bestP.raw_rating, 1)], ["K/D", fmt(bestP.kd, 2)], ["ADR", fmt(bestP.adr, 1)], ["Mapas", bestP.matches + " (" + bestP.wins + "V " + bestP.losses + "D)"]]
+      [["Vitórias", bestP.wins + "V " + bestP.losses + "D"], ["MixScore", fmt(bestP.rating, 1)], ["K/D", fmt(bestP.kd, 2)], ["ADR", fmt(bestP.adr, 1)], ["Mapas", bestP.matches]]
         .map(([l, v]) => '<div class="r"><span>' + l + "</span><b>" + v + "</b></div>").join("");
     const bx = box.getBoundingClientRect();
     let left = ev.clientX - bx.left + 14, top = ev.clientY - bx.top + 14;
     if (left + 190 > bx.width) left = ev.clientX - bx.left - 190;
-    if (top + 120 > bx.height) top = ev.clientY - bx.top - 120;
+    if (top + 140 > bx.height) top = ev.clientY - bx.top - 140;
     tip.style.left = left + "px"; tip.style.top = top + "px";
     tip.classList.add("on");
   };
   svgEl.addEventListener("pointermove", move);
-  svgEl.addEventListener("pointerleave", () => { tip.classList.remove("on"); ring.setAttribute("r", 0); });
+  svgEl.addEventListener("pointerleave", () => { hover = null; tip.classList.remove("on"); ring.setAttribute("r", 0); });
+  svgEl.addEventListener("click", (ev) => { move(ev); if (hover) openPlayer(hover.steamid64); });
 }
 let rsz;
 addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(() => renderScatter(), 120); });
@@ -1041,30 +1622,29 @@ const COLUMNS = [
   { key: "rank", label: "#", cls: "rank left rankh" },
   { key: "name", label: "Jogador", cls: "left sticky" },
   { key: "wins", label: "Vitórias" },
+  { key: "streak", label: "Forma" },
   { key: "rating", label: "MixScore" },
   { key: "kd", label: "K/D" },
   { key: "adr", label: "ADR" },
   { key: "hs_pct", label: "HS%" },
   { key: "kills", label: "K" },
   { key: "deaths", label: "D" },
-  { key: "assists", label: "A" },
-  { key: "multi_kills", label: "Multi" },
   { key: "clutch_pct", label: "Clutch" },
-  { key: "_chev", label: "" },
+  { key: "_go", label: "" },
 ];
 
-function cell(p, key, maxRating) {
+function cell(p, key) {
   switch (key) {
     case "rank": return p.rank;
     case "name":
       return '<div class="pcell"><div class="avatar">' + esc(initials(p.name)) + '</div><div><div class="pname">' + esc(p.name) +
         ' <span class="tier ' + tierOf(p.rating) + '" title="Tier ' + tierOf(p.rating) + '">' + tierOf(p.rating) + '</span></div><div class="pmeta">' +
         plural(p.matches, "mapa", "mapas") + " · " + p.rounds + " rounds</div></div></div>";
-    case "rating":
-      return '<span style="color:var(--text);font-weight:600">' + fmt(p.rating, 1) + "</span>";
     case "wins":
       return '<div class="scorecell"><div class="bar"><i style="width:' + (p.wins / MAX_WINS) * 100 + '%"></i></div><b>' + p.wins +
         '</b><span class="sub" style="min-width:58px;text-align:left">' + p.losses + "D · " + fmt(p.win_pct, 0) + "%</span></div>";
+    case "streak": return pills(p.history, 5);
+    case "rating": return '<span style="color:var(--text);font-weight:600">' + fmt(p.rating, 1) + "</span>";
     case "kd": {
       const up = p.kd >= 1;
       return '<span class="kd ' + (up ? "up" : "down") + '"><span class="tri">' + (up ? "▲" : "▼") + "</span>" + fmt(p.kd, 2) + "</span>";
@@ -1072,27 +1652,9 @@ function cell(p, key, maxRating) {
     case "adr": return '<span style="color:var(--text);font-weight:600">' + fmt(p.adr, 1) + "</span>";
     case "hs_pct": return fmt(p.hs_pct, 1) + "%";
     case "clutch_pct": return (p.clutch_att ? fmt(p.clutch_pct, 0) + "%" : "—") + '<span class="sub">' + p.clutch_won + "/" + p.clutch_att + "</span>";
-    case "_chev": return icon("chev");
+    case "_go": return icon("chevr");
     default: return p[key];
   }
-}
-
-function detailRow(p) {
-  const ds = [
-    ["MixScore", fmt(p.rating, 1)], ["Nota bruta", fmt(p.raw_rating, 1)],
-    ["K/round", fmt(p.kpr, 2)], ["Assists", p.assists],
-    ["Triplas", p.k3], ["Quadras", p.k4],
-    ["Aces", p.aces], ["Clutches", p.clutch_won + "/" + p.clutch_att],
-  ];
-  const hist = p.history.map((h) =>
-    '<tr><td class="left">' + shortDate(h.date) + '</td><td class="left" style="color:var(--text)">' + esc(h.map) + "</td>" +
-    '<td><span class="res ' + (h.won ? "w" : "l") + '">' + (h.won ? "V" : "D") + "</span></td>" +
-    "<td>" + h.score + "–" + h.opp + '</td><td style="color:var(--text)">' + h.kills + "/" + h.deaths + "/" + h.assists + "</td>" +
-    "<td>" + fmt(h.adr, 1) + "</td><td>" + h.hs_pct + "%</td></tr>").join("");
-  return '<tr class="detail"><td colspan="' + COLUMNS.length + '"><div class="detail-inner">' +
-    '<div class="dstats">' + ds.map(([l, v]) => '<div class="dstat"><div class="l">' + l + '</div><div class="v display num">' + v + "</div></div>").join("") + "</div>" +
-    '<div class="hist"><table><thead><tr><th class="left">Data</th><th class="left">Mapa</th><th>Res.</th><th>Placar</th><th>K/D/A</th><th>ADR</th><th>HS</th></tr></thead><tbody>' +
-    hist + "</tbody></table></div></div></td></tr>";
 }
 
 function renderTable(list) {
@@ -1102,11 +1664,10 @@ function renderTable(list) {
     if (typeof va === "string") return va.localeCompare(vb, "pt-BR") * state.sortDir;
     return (va - vb) * state.sortDir;
   });
-  const maxRating = Math.max(...ALL.map((p) => p.rating), 1);
 
   $("thead-row").innerHTML = COLUMNS.map((c) => {
     const cls = (c.cls || "").replace("rank ", "");
-    if (c.key === "_chev") return '<th class="' + cls + '"></th>';
+    if (c.key === "_go") return '<th class="' + cls + '"></th>';
     const sorted = c.key === state.sortKey;
     return '<th class="' + cls + '"' + (sorted ? ' aria-sort="' + (state.sortDir < 0 ? "descending" : "ascending") + '"' : "") +
       '><button type="button" data-k="' + c.key + '">' + c.label + (sorted ? '<span class="arrow">' + (state.sortDir < 0 ? "▼" : "▲") + "</span>" : "") + "</button></th>";
@@ -1118,34 +1679,22 @@ function renderTable(list) {
     renderTable(list);
   }));
 
-  if (!rows.length) {
-    $("tbody").innerHTML = '<tr><td class="empty" colspan="' + COLUMNS.length + '">Nenhum jogador encontrado.</td></tr>';
-  } else {
-    $("tbody").innerHTML = rows.map((p) => {
-      const open = state.open === p.steamid64;
-      return '<tr class="row' + (p.rank <= 3 ? " r" + p.rank : "") + (open ? " open" : "") + '" data-id="' + p.steamid64 + '" aria-expanded="' + open + '">' +
-        COLUMNS.map((c) => '<td class="' + (c.cls || "") + (c.key === "_chev" ? " chev" : "") + '">' + cell(p, c.key, maxRating) + "</td>").join("") +
-        "</tr>" + (open ? detailRow(p) : "");
-    }).join("");
-  }
-  $("tbody").querySelectorAll("tr.row").forEach((tr) => tr.addEventListener("click", () => {
-    state.open = state.open === tr.dataset.id ? null : tr.dataset.id;
-    renderTable(list);
-  }));
+  $("tbody").innerHTML = rows.length
+    ? rows.map((p) =>
+        '<tr class="row' + (p.rank <= 3 ? " r" + p.rank : "") + '" data-player="' + p.steamid64 + '">' +
+        COLUMNS.map((c) => '<td class="' + (c.cls || "") + (c.key === "_go" ? " chev" : "") + '">' + cell(p, c.key) + "</td>").join("") +
+        "</tr>").join("")
+    : '<tr><td class="empty" colspan="' + COLUMNS.length + '">Nenhum jogador encontrado.</td></tr>';
   $("count").textContent = rows.length + " de " + list.length + " jogadores";
 }
 
-/* ---------- mapas ---------- */
-const MAP_COLORS = {
-  dust2: "#c8a165", mirage: "#d9965b", inferno: "#c7503b", nuke: "#4f86c6", ancient: "#4f8f5f",
-  anubis: "#3aa0a0", train: "#8a8f98", cache: "#7d9a5a", overpass: "#6aa0c8", vertigo: "#9b7fd1",
-};
+/* ---------- partidas ---------- */
 function renderMaps() {
   $("maps").innerHTML = MAPS.map((m) => {
-    const c = MAP_COLORS[m.map.toLowerCase()] || "var(--accent-mark)";
     const team = (name, score) => '<div class="team' + (name === m.winner ? " win" : "") + '"><span class="tn">' + esc(name) +
       (name === m.winner ? '<span class="wtag">venceu</span>' : "") + '</span><span class="ts display num">' + score + "</span></div>";
-    return '<div class="card map" style="--mc:' + c + '"><div class="mh"><div class="mname display">' + esc(m.map) +
+    return '<div class="card map" data-match="' + m.id + '" style="--mc:' + (MAP_COLORS[m.slug] || "var(--accent-mark)") + '">' +
+      '<div class="mh mapimg" style="--img:url(assets/maps/' + m.slug + '.jpg);' + mapBg(m.slug) + '"><div class="mname display">' + esc(m.map) +
       '</div><div class="mdate">' + shortDate(m.date) + " · " + (m.score1 + m.score2) + " rounds</div></div>" +
       '<div class="mb">' + team(m.team1, m.score1) + team(m.team2, m.score2) +
       (m.mvp ? '<div class="mvp">' + icon("star") + "MVP <b>" + esc(m.mvp) + "</b> · " + m.mvp_kills + "/" + m.mvp_deaths + " · " + fmt(m.mvp_adr, 1) + " ADR</div>" : "") +
@@ -1154,26 +1703,29 @@ function renderMaps() {
 }
 
 /* ---------- top mapas ---------- */
+function mapPerf(players) {
+  const perf = {};
+  players.forEach((p) => p.history.forEach((h) => {
+    const k = h.slug + "|" + p.steamid64;
+    const r = perf[k] || (perf[k] = { slug: h.slug, sid: p.steamid64, name: p.name, games: 0, adr: 0, kills: 0, deaths: 0, wins: 0 });
+    r.games += 1; r.adr += h.adr; r.kills += h.kills; r.deaths += h.deaths; r.wins += h.won ? 1 : 0;
+  }));
+  return Object.values(perf);
+}
 function renderTopMaps() {
   const by = {};
   MAPS.forEach((m) => {
-    const s = by[m.map] || (by[m.map] = { map: m.map, games: 0, rounds: 0, closest: null, ot: 0 });
+    const s = by[m.slug] || (by[m.slug] = { slug: m.slug, map: m.map, games: 0, rounds: 0, closest: null, ot: 0 });
     s.games += 1;
     s.rounds += m.score1 + m.score2;
     if (m.score1 + m.score2 > 24) s.ot += 1;
     const diff = Math.abs(m.score1 - m.score2);
     if (!s.closest || diff < s.closest.diff || (diff === s.closest.diff && m.score1 + m.score2 > s.closest.total))
-      s.closest = { diff, total: m.score1 + m.score2, a: Math.max(m.score1, m.score2), b: Math.min(m.score1, m.score2) };
+      s.closest = { id: m.id, diff, total: m.score1 + m.score2, a: Math.max(m.score1, m.score2), b: Math.min(m.score1, m.score2) };
   });
-  // desempenho de cada jogador em cada mapa, a partir do histórico
-  const perf = {};
-  ALL.forEach((p) => p.history.forEach((h) => {
-    const k = h.map + "|" + p.steamid64;
-    const r = perf[k] || (perf[k] = { map: h.map, name: p.name, games: 0, adr: 0, kills: 0, deaths: 0, wins: 0 });
-    r.games += 1; r.adr += h.adr; r.kills += h.kills; r.deaths += h.deaths; r.wins += h.won ? 1 : 0;
-  }));
-  const kingOf = (map) => {
-    const cands = Object.values(perf).filter((r) => r.map === map);
+  const perf = mapPerf(ALL);
+  const kingOf = (slug) => {
+    const cands = perf.filter((r) => r.slug === slug);
     const pool = cands.filter((r) => r.games >= 2);
     const src = pool.length ? pool : cands;
     return src.reduce((a, b) => (!a || b.adr / b.games > a.adr / a.games ? b : a), null);
@@ -1183,20 +1735,291 @@ function renderTopMaps() {
   $("topmaps").innerHTML =
     '<div class="tm head"><span>#</span><span>Mapa</span><span>Jogos</span><span class="avg">Média</span><span>Rei do mapa</span><span class="close">Mais disputado</span></div>' +
     stats.map((s, i) => {
-      const c = MAP_COLORS[s.map.toLowerCase()] || "var(--accent-mark)";
-      const k = kingOf(s.map);
-      return '<div class="tm" style="--mc:' + c + '">' +
+      const k = kingOf(s.slug);
+      return '<div class="tm" data-match="' + s.closest.id + '" style="--mc:' + (MAP_COLORS[s.slug] || "var(--accent-mark)") + '">' +
         '<span class="rk display num">' + (i + 1) + "</span>" +
-        '<span class="mn display"><i></i>' + esc(s.map) + "</span>" +
+        '<span class="mn display">' + thumb(s.slug) + esc(s.map) + "</span>" +
         '<span class="games"><span class="n display num">' + s.games + '</span><span class="bar"><i style="width:' + (s.games / maxGames) * 100 + '%"></i></span>' +
         '<span class="pct num">' + fmt((s.games / MAPS.length) * 100, 0) + "%</span></span>" +
         '<span class="avg num">' + fmt(s.rounds / s.games, 1) + "<small>rounds/jogo" + (s.ot ? " · " + plural(s.ot, "prorrogação", "prorrogações") : "") + "</small></span>" +
-        (k ? '<span class="king">' + icon("star") + '<span style="min-width:0"><div class="kn">' + esc(k.name) + '</div><div class="kd2">' +
+        (k ? '<span class="king">' + icon("star") + '<span style="min-width:0"><div class="kn">' + playerLink(k.sid, k.name) + '</div><div class="kd2">' +
           fmt(k.adr / k.games, 1) + " ADR · " + k.kills + "/" + k.deaths + " · " + plural(k.games, "jogo", "jogos") + "</div></span></span>" : "<span></span>") +
         '<span class="close num">' + s.closest.a + "–" + s.closest.b + "<small>" + (s.closest.diff <= 2 ? "no detalhe" : "diferença de " + s.closest.diff) + "</small></span>" +
         "</div>";
     }).join("");
 }
+
+/* ---------- perfil do jogador ---------- */
+let lastFocus = null;
+function lock() { document.body.classList.add("locked"); }
+function unlockIfIdle() { if (!$("drawer").classList.contains("on") && !$("modal-wrap").classList.contains("on")) document.body.classList.remove("locked"); }
+
+function openPlayer(sid) {
+  const ranked = visiblePlayers();
+  const p = ranked.find((x) => x.steamid64 === sid) || BYSID[sid] ||
+    (SCOPES[0].players.find((x) => x.steamid64 === sid) && enrich(SCOPES[0].players.find((x) => x.steamid64 === sid)));
+  if (!p) return;
+  const scopeName = S.id === "all" ? "todas as noites" : S.label.toLowerCase();
+  const rankTxt = p.rank ? "#" + p.rank + " no ranking" : "fora do filtro atual";
+  const cells = [
+    ["Vitórias", p.wins + "–" + p.losses, fmt(p.win_pct, 0) + "% de aproveitamento"],
+    ["MixScore", fmt(p.rating, 1), "nota bruta " + fmt(p.raw_rating, 1)],
+    ["K/D", fmt(p.kd, 2), p.kills + " kills · " + p.deaths + " mortes"],
+    ["ADR", fmt(p.adr, 1), fmt(p.kpr, 2) + " kills por round"],
+    ["Headshot", fmt(p.hs_pct, 0) + "%", Math.round(p.kills * p.hs_pct / 100) + " na cabeça"],
+    ["Clutch", p.clutch_won + "/" + p.clutch_att, p.clutch_att ? fmt(p.clutch_pct, 0) + "% (1v1 e 1v2)" : "nenhum"],
+    ["Multi-kills", p.multi_kills, p.k3 + " triplas · " + p.k4 + " quadras"],
+    ["Aces", p.aces, p.assists + " assistências"],
+  ];
+  const rel = (lbl, r, fmtS) => r
+    ? '<div class="rel"><div class="l">' + lbl + '</div><div class="n">' + playerLink(r.sid, r.name) + '</div><div class="s">' + fmtS(r) + "</div></div>"
+    : '<div class="rel none"><div class="l">' + lbl + '</div><div class="n">—</div><div class="s">poucos jogos pra dizer</div></div>';
+  const perMap = mapPerf([p]).sort((a, b) => b.games - a.games || b.wins - a.wins);
+  const streakTxt = p.streak >= 2 ? "<b>" + p.streak + " vitórias</b> seguidas agora" :
+    p.streak <= -2 ? "<b>" + -p.streak + " derrotas</b> seguidas agora" :
+    p.streak === 1 ? "venceu o último mapa" : p.streak === -1 ? "perdeu o último mapa" : "";
+
+  $("drawer").innerHTML =
+    '<div class="dr-head"><div class="avatar">' + esc(initials(p.name)) + '</div><div style="min-width:0"><div class="nm">' + esc(p.name) +
+    ' <span class="tier ' + tierOf(p.rating) + '">' + tierOf(p.rating) + '</span></div><div class="sub2">' + rankTxt + " · " + scopeName + " · " +
+    plural(p.matches, "mapa", "mapas") + " · " + p.rounds + ' rounds</div></div><button class="x" type="button" id="dr-x" aria-label="Fechar">' + icon("x") + "</button></div>" +
+    '<div class="dr-body">' +
+    '<div class="dr-sec"><div class="dgrid">' + cells.map(([l, v, s]) =>
+      '<div class="dcell"><div class="l">' + l + '</div><div class="v display num">' + v + '</div><div class="s">' + s + "</div></div>").join("") + "</div></div>" +
+    '<div class="dr-sec"><h4>Forma</h4><div class="formline">' + pills(p.history, 10) + (streakTxt ? "<span>" + streakTxt + "</span>" : "") +
+    "<span>melhor sequência: <b>" + plural(p.best_streak, "vitória", "vitórias") + "</b></span></div></div>" +
+    '<div class="dr-sec"><h4>Parceiros e rivais</h4><div class="rels">' +
+    rel("Melhor parceiro", p.partner, (r) => r.wins + " vitórias em " + plural(r.games, "jogo", "jogos") + " juntos") +
+    rel("Freguês", p.fregues, (r) => "venceu " + r.wins + " de " + (r.wins + r.losses) + " contra") +
+    rel("Carrasco", p.carrasco, (r) => "perdeu " + r.losses + " de " + (r.wins + r.losses) + " contra") +
+    "</div></div>" +
+    '<div class="dr-sec"><h4>Por mapa</h4><div class="permap"><div class="pm-row head"><span></span><span class="mn-h">Mapa</span><span>Jogos</span><span>V–D</span><span>ADR</span><span>K/D</span></div>' +
+    perMap.map((r) => {
+      const name = (p.history.find((h) => h.slug === r.slug) || {}).map || r.slug;
+      return '<div class="pm-row">' + thumb(r.slug) + '<span class="mn">' + esc(name) + "</span><span>" + r.games + "</span><span>" + r.wins + "–" + (r.games - r.wins) +
+        "</span><span>" + fmt(r.adr / r.games, 1) + "</span><span>" + fmt(r.kills / Math.max(r.deaths, 1), 2) + "</span></div>";
+    }).join("") + "</div></div>" +
+    '<div class="dr-sec"><h4>Partidas (' + p.history.length + ')</h4><div class="matches"><div class="mt-row head"><span></span><span>Mapa</span><span></span><span class="r">Placar</span><span class="r">K/D/A</span><span class="r">ADR</span><span></span></div>' +
+    p.history.map((h) =>
+      '<div class="mt-row" data-match="' + h.mid + '">' + thumb(h.slug) + '<span><span class="mn">' + esc(h.map) + '</span><div class="dt">' + shortDate(h.date) + "</div></span>" +
+      '<span class="res ' + (h.won ? "w" : "l") + '">' + (h.won ? "V" : "D") + '</span><span class="r">' + h.score + "–" + h.opp + '</span><span class="r kda">' +
+      h.kills + "/" + h.deaths + "/" + h.assists + '</span><span class="r">' + fmt(h.adr, 1) + "</span>" + icon("chevr") + "</div>").join("") +
+    "</div></div></div>";
+
+  $("drawer").scrollTop = 0;
+  if (!$("drawer").classList.contains("on")) lastFocus = document.activeElement;
+  $("drawer").classList.add("on");
+  $("overlay").classList.add("on");
+  lock();
+  $("dr-x").addEventListener("click", closePlayer);
+  $("dr-x").focus({ preventScroll: true });
+}
+function closePlayer() {
+  $("drawer").classList.remove("on");
+  $("overlay").classList.remove("on");
+  unlockIfIdle();
+  if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+}
+
+/* ---------- placar da partida ---------- */
+function openMatch(id) {
+  const m = ALL_MAPS[id];
+  if (!m) return;
+  const w1 = m.winner === m.team1;
+  const board = (name, score, rows, win) =>
+    '<div class="board' + (win ? " win" : "") + '"><div class="bh">' + esc(name) + '<span class="tag' + (win ? "" : " l") + '">' + (win ? "venceu" : "perdeu") +
+    '</span><span class="sc num">' + score + '</span></div><div class="scroll"><table><thead><tr><th class="pl">Jogador</th><th>K</th><th>D</th><th>A</th><th>+/−</th><th>ADR</th><th>HS%</th><th>3K+</th></tr></thead><tbody>' +
+    rows.map((r) => {
+      const diff = r.k - r.d;
+      return '<tr><td class="pl">' + playerLink(r.sid, r.name) + (r.sid === m.mvp_sid ? icon("star") : "") + "</td><td>" + r.k + "</td><td>" + r.d + "</td><td>" + r.a +
+        '</td><td style="color:' + (diff > 0 ? "var(--good)" : diff < 0 ? "var(--bad)" : "var(--text-3)") + '">' + (diff > 0 ? "+" : "") + diff +
+        "</td><td>" + fmt(r.adr, 1) + "</td><td>" + r.hs + "%</td><td>" + r.mk + "</td></tr>";
+    }).join("") + "</tbody></table></div></div>";
+  const first = w1 ? ["team1", m.team1, m.score1] : ["team2", m.team2, m.score2];
+  const second = w1 ? ["team2", m.team2, m.score2] : ["team1", m.team1, m.score1];
+  $("modal").innerHTML =
+    '<div class="banner mapimg" style="' + mapBg(m.slug) + '"><button class="x" type="button" id="md-x" aria-label="Fechar">' + icon("x") + "</button>" +
+    '<div class="bm">' + shortDate(m.date) + " · " + (m.score1 + m.score2) + " rounds" + (m.mvp ? " · MVP " + esc(m.mvp) : "") + "</div>" +
+    '<div class="bn display">' + esc(m.map) + "</div>" +
+    '<div class="bscore"><span class="bt' + (w1 ? " win" : "") + '">' + esc(m.team1) + '</span><span class="bs display num"><span class="' + (w1 ? "w" : "lo") + '">' + m.score1 +
+    '</span><i>:</i><span class="' + (w1 ? "lo" : "w") + '">' + m.score2 + '</span></span><span class="bt r' + (w1 ? "" : " win") + '">' + esc(m.team2) + "</span></div></div>" +
+    '<div class="boards">' + board(first[1], first[2], m.board[first[0]], true) + board(second[1], second[2], m.board[second[0]], false) + "</div>";
+  $("modal-wrap").classList.add("on");
+  lock();
+  $("md-x").addEventListener("click", closeMatch);
+  $("md-x").focus({ preventScroll: true });
+}
+function closeMatch() {
+  $("modal-wrap").classList.remove("on");
+  unlockIfIdle();
+}
+
+/* ---------- cliques ---------- */
+document.addEventListener("click", (e) => {
+  const inModal = e.target.closest("#modal");
+  if (e.target.id === "modal-wrap") { closeMatch(); return; }
+  if (e.target.id === "overlay") { closePlayer(); return; }
+  const pl = e.target.closest("[data-player]");
+  const mt = e.target.closest("[data-match]");
+  // o nome clicado vence o card (ex: jogador dentro de uma linha clicável)
+  if (pl && (!mt || mt.contains(pl))) {
+    if (inModal) closeMatch();
+    openPlayer(pl.dataset.player);
+    return;
+  }
+  if (mt) openMatch(mt.dataset.match);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if ($("modal-wrap").classList.contains("on")) closeMatch();
+  else if ($("drawer").classList.contains("on")) closePlayer();
+});
+
+/* ---------- montar times ---------- */
+// força = MixScore (já com peso de confiança) + 20 × (aproveitamento ajustado − 50%)
+// aproveitamento ajustado = (vitórias + 2,5) / (mapas + 5): começa em 50% e vai pro real conforme joga
+const BD_BASE = SCOPES[0].players.map((p) => ({
+  sid: p.steamid64, name: p.name, matches: p.matches,
+  strength: p.rating + 20 * ((p.wins + 2.5) / (p.matches + 5) - 0.5),
+}));
+const BD_MEDIAN = (() => { const v = BD_BASE.map((p) => p.strength).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : 55; })();
+const bd = { sel: new Set(), guests: [], result: null, q: "" };
+try {
+  const saved = JSON.parse(localStorage.getItem("mix-teams") || "null");
+  if (saved) { bd.guests = saved.guests || []; (saved.sel || []).forEach((s) => bd.sel.add(s)); }
+} catch (e) {}
+const bdSave = () => { try { localStorage.setItem("mix-teams", JSON.stringify({ sel: Array.from(bd.sel), guests: bd.guests })); } catch (e) {} };
+const bdPool = () => BD_BASE.concat(bd.guests.map((g) => ({ sid: "g:" + g, name: g, matches: 0, strength: BD_MEDIAN, guest: true })));
+const bdSelected = () => bdPool().filter((p) => bd.sel.has(p.sid));
+
+function bdSplits(players) {
+  // todas as divisões em dois times (o 1º jogador fica sempre no time A pra não repetir espelhado)
+  const n = players.length, k = Math.floor(n / 2), out = [];
+  const rec = (start, pick) => {
+    if (pick.length === k) {
+      const a = pick.map((i) => players[i]);
+      const b = players.filter((_, i) => !pick.includes(i));
+      const avg = (t) => t.reduce((s, p) => s + p.strength, 0) / t.length;
+      out.push({ a, b, sa: avg(a), sb: avg(b), diff: Math.abs(avg(a) - avg(b)) });
+      return;
+    }
+    for (let i = start; i < n; i++) rec(i + 1, pick.concat(i));
+  };
+  rec(1, [0]);
+  return out.sort((x, y) => x.diff - y.diff);
+}
+
+function bdRun(random) {
+  const players = bdSelected();
+  if (players.length < 2 || players.length % 2 || players.length > 16) return;
+  const splits = bdSplits(players);
+  let pick = splits[0];
+  if (random) {
+    // sorteia entre as divisões quase tão boas quanto a melhor
+    const good = splits.filter((s) => s.diff <= splits[0].diff + 1).slice(0, 20);
+    const key = (s) => s.a.map((p) => p.sid).sort().join();
+    const others = good.filter((s) => !bd.result || key(s) !== key(bd.result));
+    const pool = others.length ? others : good;
+    pick = pool[Math.floor(Math.random() * pool.length)];
+  }
+  // time A = o do jogador mais forte, pra ordem ficar estável
+  const top = (t) => Math.max(...t.map((p) => p.strength));
+  if (top(pick.b) > top(pick.a)) pick = { a: pick.b, b: pick.a, sa: pick.sb, sb: pick.sa, diff: pick.diff };
+  bd.result = pick;
+  renderBuilderResult();
+}
+
+function renderBuilderResult() {
+  const r = bd.result;
+  const box = $("bd-result");
+  if (!r) { box.innerHTML = ""; return; }
+  const sort = (t) => t.slice().sort((x, y) => y.strength - x.strength);
+  const A = sort(r.a), B = sort(r.b);
+  const pa = (r.sa / (r.sa + r.sb)) * 100;
+  const verdict = r.diff < 1 ? "muito equilibrado" : r.diff < 2.5 ? "equilibrado" : r.diff < 5 ? "um pouco desequilibrado" : "desequilibrado";
+  const card = (cls, t, avg) => '<div class="team-card ' + cls + '"><div class="th"><span class="nm display">Time ' + esc(t[0].name) + "</span>" +
+    '<span class="st">força média <b class="num">' + fmt(avg, 1) + "</b></span></div>" +
+    t.map((p, i) => '<div class="tp"><div class="avatar">' + esc(initials(p.name)) + '</div><span class="n">' +
+      (p.guest ? esc(p.name) + ' <span class="s">(convidado)</span>' : playerLink(p.sid, p.name)) + "</span>" +
+      (i === 0 ? '<span class="cap">capitão</span>' : "") + '<span class="s">' + fmt(p.strength, 1) + "</span></div>").join("") + "</div>";
+  box.innerHTML =
+    '<div class="balance"><span class="side display num">' + fmt(pa, 1) + '%</span><div class="meter" title="parcela da força total">' +
+    '<i class="a" style="width:' + pa + '%"></i><i class="b" style="width:' + (100 - pa) + '%"></i></div><span class="side display num">' + fmt(100 - pa, 1) + "%</span></div>" +
+    '<div class="verdict"><b>' + verdict + "</b> · diferença de " + fmt(r.diff, 1) + " ponto" + (r.diff >= 1.95 ? "s" : "") + " de força média</div>" +
+    '<div class="teams">' + card("a", A, r.sa) + card("b", B, r.sb) + "</div>";
+}
+
+function renderBuilder() {
+  const pool = bdPool().filter((p) => !bd.q || p.name.toLowerCase().includes(bd.q))
+    .sort((a, b) => (bd.sel.has(b.sid) - bd.sel.has(a.sid)) || (b.guest ? 1 : 0) - (a.guest ? 1 : 0) || b.matches - a.matches || a.name.localeCompare(b.name, "pt-BR"));
+  $("bd-chips").innerHTML = pool.map((p) =>
+    '<button type="button" class="chip' + (p.guest ? " guest" : "") + '" data-sid="' + esc(p.sid) + '" aria-pressed="' + bd.sel.has(p.sid) + '">' +
+    '<span class="avatar">' + esc(initials(p.name)) + "</span>" + esc(p.name) + " <small>" + fmt(p.strength, 0) + "</small></button>").join("") ||
+    '<span class="bd-msg">Ninguém com esse nome.</span>';
+  const n = bdSelected().length;
+  $("bd-count").innerHTML = "<b>" + n + "</b> " + (n === 1 ? "selecionado" : "selecionados");
+  const ok = n >= 2 && n % 2 === 0 && n <= 16;
+  $("bd-balance").disabled = !ok;
+  $("bd-shuffle").disabled = !ok;
+  $("bd-copy").disabled = !bd.result;
+  $("bd-hint").textContent = n === 0 ? "clique nos jogadores que vão jogar" : n % 2 ? "número ímpar: falta 1 jogador" :
+    n > 16 ? "máximo de 16 jogadores" : n === 10 ? "5x5 pronto pra equilibrar" : n / 2 + "x" + n / 2;
+}
+
+$("bd-chips").addEventListener("click", (e) => {
+  const c = e.target.closest(".chip");
+  if (!c) return;
+  const sid = c.dataset.sid;
+  if (bd.sel.has(sid)) bd.sel.delete(sid); else bd.sel.add(sid);
+  bd.result = null;
+  bdSave(); renderBuilder(); renderBuilderResult();
+});
+$("bd-search").addEventListener("input", (e) => { bd.q = e.target.value.trim().toLowerCase(); renderBuilder(); });
+const bdAddGuest = () => {
+  const name = $("bd-guest").value.trim();
+  if (!name || bd.guests.includes(name)) return;
+  bd.guests.push(name);
+  bd.sel.add("g:" + name);
+  $("bd-guest").value = "";
+  bd.result = null;
+  bdSave(); renderBuilder(); renderBuilderResult();
+};
+$("bd-add").addEventListener("click", bdAddGuest);
+$("bd-guest").addEventListener("keydown", (e) => { if (e.key === "Enter") bdAddGuest(); });
+$("bd-balance").addEventListener("click", () => { bdRun(false); renderBuilder(); });
+$("bd-shuffle").addEventListener("click", () => { bdRun(true); renderBuilder(); });
+$("bd-clear").addEventListener("click", () => { bd.sel.clear(); bd.guests = []; bd.result = null; bdSave(); renderBuilder(); renderBuilderResult(); });
+function toast(msg) {
+  let t = document.querySelector(".toast");
+  if (!t) { t = document.createElement("div"); t.className = "toast"; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 1800);
+}
+$("bd-copy").addEventListener("click", () => {
+  const r = bd.result;
+  if (!r) return;
+  const NL = String.fromCharCode(10);
+  const line = (t, avg) => "Time " + t[0].name + " (força " + fmt(avg, 1) + "): " + t.map((p) => p.name).join(", ");
+  const sort = (t) => t.slice().sort((x, y) => y.strength - x.strength);
+  const text = line(sort(r.a), r.sa) + NL + line(sort(r.b), r.sb);
+  const done = () => toast("Times copiados!");
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => prompt("Copie os times:", text));
+  else prompt("Copie os times:", text);
+});
+renderBuilder();
+
+/* ---------- rodapé ---------- */
+$("footer").innerHTML =
+  "<b>Como ler.</b> Só entram mapas finalizados em que os dois times estavam completos; espectadores são ignorados. " +
+  "Uma <b>noite</b> junta os mapas jogados sem intervalo de mais de 4h (mapa de madrugada conta pra noite anterior). " +
+  "<b>Ranking</b> ordenado por vitórias; empate é decidido pelo aproveitamento (% de vitórias) e depois pelo MixScore. " +
+  "<b>MixScore</b> combina kills por round, ADR, HS%, clutch% e K/D numa nota só (a <b>nota bruta</b>) e depois aplica um peso de confiança: " +
+  "quem jogou poucos rounds fica puxado pra média e vai ganhando a própria nota conforme joga " +
+  "(com " + PAYLOAD.confidence + " rounds, fica no meio do caminho). " +
+  "<b>Tiers</b>: S ≥ 72 · A ≥ 65 · B ≥ 58 · C ≥ 50 · D abaixo disso. " +
+  "<b>Freguês</b> é o adversário que o jogador mais venceu; <b>carrasco</b>, o que mais venceu ele (mínimo de 2 confrontos). " +
+  "Em todas as noites, jogadores com menos de " + PAYLOAD.minRounds + " rounds não aparecem. " +
+  "Imagens dos mapas: ghostcap-gaming/cs2-map-images.";
 
 /* ---------- tudo ---------- */
 function renderAll() {
@@ -1204,8 +2027,17 @@ function renderAll() {
   renderSeg();
   renderPodium(list);
   renderAwards(list);
+  renderForms(list);
   renderScatter(list);
   renderTable(list);
+}
+function renderScope() {
+  renderHeader();
+  renderLastNight();
+  renderTopMaps();
+  renderPairs();
+  renderMaps();
+  renderAll();
 }
 $("search").addEventListener("input", (e) => {
   state.q = e.target.value.trim().toLowerCase();
@@ -1213,29 +2045,17 @@ $("search").addEventListener("input", (e) => {
   renderTable(list);
   renderScatter(list);
 });
-renderMaps();
-renderTopMaps();
-renderAll();
+setScope("all");
 </script>
 </body>
 </html>
 """
 
 
-def render_html(
-    players: list[dict], maps: list[dict], db_paths: list[Path], team_size: int, min_rounds: int, confidence: int
-) -> str:
-    dates = sorted(m["date"][:10] for m in maps if m["date"])
-    period = ""
-    if dates:
-        fmt_date = lambda d: f"{d[8:10]}/{d[5:7]}"
-        period = f" · {fmt_date(dates[0])} a {fmt_date(dates[-1])}"
-    sources = " + ".join(p.name for p in db_paths)
+def render_html(scopes: list[dict], db_paths: list[Path], team_size: int, min_rounds: int, confidence: int) -> str:
     payload = {
-        "players": players,
-        "maps": maps,
-        "period": period.lstrip(" ·"),
-        "sources": sources,
+        "scopes": scopes,
+        "sources": " + ".join(p.name for p in db_paths),
         "teamSize": team_size,
         "minRounds": min_rounds,
         "confidence": confidence,
@@ -1277,19 +2097,31 @@ def main():
 
     db_paths = find_dbs(args.db)
     all_maps = load_maps(db_paths, args.team_size)
-    players = fetch_players(all_maps, args.min_rounds, args.confianca)
+    everything = build_scope(all_maps, args.min_rounds, args.confianca, min_pair_games=3)
 
-    if not players:
+    if not everything["players"]:
         sys.exit(
             "Nenhum jogador encontrado (ou todos abaixo do --min-rounds). "
             "Confira se já foram jogadas partidas completas pelo MatchZy."
         )
 
-    maps = fetch_maps(all_maps, {p["steamid64"]: p["name"] for p in players})
-    html = render_html(players, maps, db_paths, args.team_size, args.min_rounds, args.confianca)
+    nights = split_nights(all_maps)
+    dates = [n[0]["start_time"] for n in nights]
+    period = f"{night_label(nights[0])} a {dates[-1][8:10]}/{dates[-1][5:7]}" if nights else ""
+    scopes = [{"id": "all", "label": "Todas as noites", "period": period, **everything}]
+    # noites da mais recente pra mais antiga; o MixScore de cada noite usa só os mapas dela
+    for night in reversed(nights):
+        scope = build_scope(night, 1, args.confianca, min_pair_games=2)
+        if scope["players"]:
+            scopes.append({"id": "n" + night[0]["start_time"][:10], "label": "Noite de " + night_label(night), "period": night_label(night), **scope})
+
+    html = render_html(scopes, db_paths, args.team_size, args.min_rounds, args.confianca)
     out_path = Path(args.out)
     out_path.write_text(html, encoding="utf-8")
-    print(f"Ranking gerado: {out_path.resolve()}  ({len(players)} jogadores, {len(maps)} mapas)")
+    print(
+        f"Ranking gerado: {out_path.resolve()}  "
+        f"({len(everything['players'])} jogadores, {len(everything['maps'])} mapas, {len(nights)} noites)"
+    )
 
 
 if __name__ == "__main__":

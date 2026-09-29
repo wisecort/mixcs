@@ -6,8 +6,14 @@ O dono usa isso **todo dia** depois das sessões de mix. Responda em **portuguê
 ## O que é
 
 `matchzy_ranking.py` lê o banco SQLite do plugin MatchZy (`matchzy.db`) e gera um painel
-estático `index.html` com o ranking do mix: pódio, destaques, top mapas, gráfico ADR × K/D,
-classificação com histórico por jogador e o resultado de cada mapa.
+estático `index.html` com o ranking do mix: seletor de noite, última noite (MVP), **montar times**
+(equilibra dois times a partir de quem vai jogar), pódio,
+destaques, forma (sequências), top mapas, duplas e rivalidades, gráfico ADR × K/D,
+classificação, perfil de cada jogador (painel lateral com todas as partidas) e o placar
+completo de cada mapa (janela ao clicar numa partida).
+
+Site: **https://mixcs-eta.vercel.app/** — a Vercel publica automaticamente a cada push na `main`
+(serve o `index.html` e a pasta `assets/` direto do repositório; não há build).
 
 Repositório público: `https://github.com/wisecort/mixcs` (branch `main`). Tudo aqui é
 público de propósito, incluindo o `matchzy.db` e os Steam IDs no HTML — o dono autorizou.
@@ -19,6 +25,7 @@ público de propósito, incluindo o `matchzy.db` e os Steam IDs no HTML — o do
 | `matchzy_ranking.py` | Script único: leitura do banco, cálculo das métricas e template HTML (`HTML_TEMPLATE`) |
 | `matchzy.db` | Banco do MatchZy mais recente (vem do servidor; às vezes chega como `matchzy (1).db` pelo download) |
 | `index.html` | Saída gerada — **nunca editar à mão**, sempre regenerar pelo script |
+| `assets/maps/*.jpg` | Imagens dos mapas (640px) usadas pela página — precisam ir junto com o `index.html` |
 | `docs/uso-diario.md` | Rotina diária passo a passo, checagens e comandos |
 | `docs/como-funciona.md` | Regras do ranking, métricas, estrutura do código e como mexer no visual |
 
@@ -68,7 +75,9 @@ Explicação completa e fórmulas: **`docs/como-funciona.md`**.
   usa o GitHub CLI (`gh`, conta `wisecort`) via `credential.helper` configurado neste repositório.
 - Commitar tudo (script, banco, HTML, docs).
 - Mensagem padrão do commit diário: `Atualiza ranking até DD/MM` (data da última partida).
-- Só faça commit/push quando o dono pedir.
+- Só faça commit/push quando o dono pedir. **Push = site no ar** (Vercel), então confira a página antes.
+- Depois do push, espere ~1 min e confirme que o site atualizou:
+  `curl -s https://mixcs-eta.vercel.app/ | grep -o '"period": "[^"]*"' | head -1`
 - Antes do push, rode `git pull --no-rebase` — o dono às vezes sobe arquivos direto pelo site do
   GitHub. Se der conflito no `index.html`, **regenere** com o script em vez de escolher um lado.
 - Não use SSH (o `github.com` não está no `known_hosts` do Mac dele). Se o push pedir senha,

@@ -94,6 +94,10 @@ git push
 
 `DD/MM` = data da última partida (aparece no topo da página, em "24/09 a 29/09").
 
+O push publica sozinho em **https://mixcs-eta.vercel.app/** (Vercel ligada ao repositório).
+Em ~1 minuto o site atualiza; confira abrindo o link ou com
+`curl -s https://mixcs-eta.vercel.app/ | grep -o '"period": "[^"]*"' | head -1`.
+
 O remote é HTTPS (`https://github.com/wisecort/mixcs.git`) autenticado pelo `gh`. Se o
 `pull` der conflito no `index.html`, rode `python3 matchzy_ranking.py` de novo e commite o
 resultado. Se o push pedir senha, confira `gh auth status`.
