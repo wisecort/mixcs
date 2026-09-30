@@ -59,23 +59,40 @@ def find_dbs(explicit_paths: list[str] | None) -> list[Path]:
     )
 
 
-# mapas finalizados (com vencedor e horário de fim) em que os dois times
-# tinham pelo menos `team_size` jogadores (sem contar espectadores)
-COMPLETE_MAPS_SQL = """
-    SELECT {cols}
+# mapas finalizados: com vencedor e horário de fim. A checagem de times completos
+# é feita em Python (`resolve_roster`), porque às vezes quem jogou aparece como espectador.
+FINISHED_MAPS_SQL = """
+    SELECT m.*
     FROM matchzy_stats_maps m
     WHERE m.end_time IS NOT NULL AND m.end_time != ''
       AND m.winner IS NOT NULL AND m.winner != ''
-      AND (
-        SELECT COUNT(*) FROM (
-          SELECT p.team FROM matchzy_stats_players p
-          WHERE p.matchid = m.matchid AND p.mapnumber = m.mapnumber
-            AND p.team != 'Spectator'
-          GROUP BY p.team
-          HAVING COUNT(*) >= ?
-        )
-      ) = 2
 """
+
+
+def resolve_roster(rows: list[dict], team1: str, team2: str, team_size: int) -> list[dict] | None:
+    """Monta a escalação do mapa, ou devolve None se os times não estavam completos.
+
+    O MatchZy grava o último time de cada jogador. Quem jogou e foi pro espectador no fim
+    fica como `Spectator`, mas com kills/mortes/dano. Esses "espectadores ativos" voltam
+    pro time que ficou desfalcado, desde que só um time esteja faltando gente e eles caibam
+    nele. Espectador sem nenhuma estatística (só assistiu) é ignorado.
+    """
+    players = [dict(r) for r in rows if r["team"] != "Spectator"]
+    active = [
+        dict(r) for r in rows
+        if r["team"] == "Spectator" and (r["kills"] or r["deaths"] or r["damage"])
+    ]
+    count = {t: sum(1 for r in players if r["team"] == t) for t in (team1, team2)}
+    short = [t for t in (team1, team2) if count[t] < team_size]
+    if active and len(short) == 1 and len(active) <= team_size - count[short[0]]:
+        for r in active:
+            r["team"] = short[0]
+            r["was_spectator"] = True
+        players += active
+        count[short[0]] += len(active)
+    if any(count[t] < team_size for t in (team1, team2)):
+        return None
+    return players
 
 
 def load_maps(db_paths: list[Path], team_size: int) -> list[dict]:
@@ -91,32 +108,35 @@ def load_maps(db_paths: list[Path], team_size: int) -> list[dict]:
         con = sqlite3.connect(str(db_path))
         con.row_factory = sqlite3.Row
         cur = con.cursor()
-        cur.execute(COMPLETE_MAPS_SQL.format(cols="m.*"), (team_size,))
+        cur.execute(FINISHED_MAPS_SQL)
         for m in cur.fetchall():
             fingerprint = (m["start_time"], m["mapname"], m["mapnumber"], m["team1_score"], m["team2_score"])
             if fingerprint in seen:
                 continue
-            seen.add(fingerprint)
             cur2 = con.cursor()
             cur2.execute(
                 "SELECT team1_name, team2_name FROM matchzy_stats_matches WHERE matchid = ?",
                 (m["matchid"],),
             )
             teams = cur2.fetchone()
-            # espectadores não jogaram o mapa, então não contam
+            team1 = teams["team1_name"] if teams else ""
+            team2 = teams["team2_name"] if teams else ""
             cur2.execute(
-                "SELECT * FROM matchzy_stats_players "
-                "WHERE matchid = ? AND mapnumber = ? AND team != 'Spectator'",
+                "SELECT * FROM matchzy_stats_players WHERE matchid = ? AND mapnumber = ?",
                 (m["matchid"], m["mapnumber"]),
             )
+            roster = resolve_roster(cur2.fetchall(), team1, team2, team_size)
+            if roster is None:
+                continue
+            seen.add(fingerprint)
             maps.append(
                 {
                     **dict(m),
                     "key": (i, m["matchid"], m["mapnumber"]),
                     "rounds": m["team1_score"] + m["team2_score"],
-                    "team1_name": teams["team1_name"] if teams else "",
-                    "team2_name": teams["team2_name"] if teams else "",
-                    "players": [dict(r) for r in cur2.fetchall()],
+                    "team1_name": team1,
+                    "team2_name": team2,
+                    "players": roster,
                 }
             )
         con.close()

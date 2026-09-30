@@ -48,7 +48,8 @@ Detalhes, comandos prontos e casos especiais: **`docs/uso-diario.md`**.
 - Ordem: **vitórias** → desempate por **% de vitórias** → depois **MixScore**.
   O dono pediu explicitamente ranking por vitória, não por nota.
 - Só contam mapas **finalizados** (com vencedor e `end_time`) com os **dois times completos**
-  (`--team-size`, padrão 5). Linhas de `Spectator` são ignoradas.
+  (`--team-size`, padrão 5). `Spectator` com tudo zerado é ignorado; `Spectator` com
+  kills/mortes/dano jogou e volta pro time desfalcado (`resolve_roster()`).
 - MixScore tem **peso de confiança** (`--confianca`, padrão 100 rounds) pra quem jogou pouco
   não aparecer no topo.
 - Destaques só consideram quem tem **100+ rounds** (mesmo valor do `--confianca`).

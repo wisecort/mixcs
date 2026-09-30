@@ -17,6 +17,17 @@ Se o navegador salvar como `matchzy (1).db`, renomeie:
 mv "matchzy (1).db" matchzy.db
 ```
 
+> **Baixe também o `matchzy.db-wal`** (se existir, fica do lado do `matchzy.db` no servidor).
+> O SQLite do MatchZy grava as partidas recentes primeiro nesse arquivo e só depois passa pro
+> `.db`. Sem ele, as últimas partidas não aparecem. Com os dois na pasta, consolide antes de gerar:
+>
+> ```bash
+> sqlite3 matchzy.db "PRAGMA wal_checkpoint(TRUNCATE);"   # joga o -wal pra dentro do .db
+> ```
+>
+> Se o banco novo vier idêntico ao commitado (`git status` não mostra `matchzy.db`), avise o dono:
+> quase sempre é a partida nova presa no `-wal` do servidor.
+
 > O banco do servidor é **acumulativo**: o arquivo novo já contém as partidas antigas.
 > Só use vários bancos juntos (§ 4) se o servidor tiver sido **resetado** e o banco antigo
 > tiver ficado salvo à parte.
@@ -41,6 +52,8 @@ sqlite3 -header matchzy.db "select matchid, team, count(*) n from matchzy_stats_
 O que reportar pro dono:
 
 - mapas sem vencedor (normalmente partida abandonada ou `.restart`);
+- `Spectator` com kills/mortes/dano: jogou e saiu pro espectador no fim — o script devolve pro
+  time desfalcado automaticamente (confira se o mapa entrou);
 - times com menos de 5 (mapa fica fora) ou mais de 5 (alguém entrou no lugar de outro no
   meio — **conta normal**, os dois jogadores ficam com o resultado);
 - se algum jogador parece somar coisa demais, confira o `steamid64` — é comum a mesma pessoa

@@ -14,12 +14,16 @@ Times vêm como `team_<capitão>` (espaços viram `_`); `team_label()` limpa iss
 
 ## Filtro de mapas
 
-`COMPLETE_MAPS_SQL` / `load_maps()` só aceitam mapas:
+`FINISHED_MAPS_SQL` / `load_maps()` / `resolve_roster()` só aceitam mapas:
 
 1. com `winner` e `end_time` preenchidos (terminaram de verdade);
-2. em que **os dois** times têm pelo menos `--team-size` jogadores (sem contar `Spectator`).
+2. em que **os dois** times têm pelo menos `--team-size` jogadores.
 
-Linhas de `Spectator` nunca entram nas estatísticas. Com vários bancos, cada mapa ganha a chave
+**Espectadores:** o MatchZy grava o *último* time de cada jogador, então quem jogou e foi pro
+espectador no fim aparece como `Spectator` mas com kills/mortes/dano. `resolve_roster()` devolve
+esses "espectadores ativos" pro time que ficou desfalcado (só se exatamente um time estiver
+faltando gente e eles couberem nele). Espectador com tudo zerado só assistiu e é ignorado.
+Exemplo real: partida 27 (Anubis, 30/09), GNS e g U h' estavam como espectadores. Com vários bancos, cada mapa ganha a chave
 `(índice do banco, matchid, mapnumber)` e duplicatas são descartadas pela "impressão digital"
 `(start_time, mapname, mapnumber, placar)`.
 
