@@ -37,6 +37,10 @@ DEFAULT_DB_CANDIDATES = [
     "game/csgo/addons/counterstrikesharp/plugins/MatchZy/matchzy.db",
 ]
 
+# Início da temporada atual: mapas começados antes disso ficam fora do ranking.
+# Quem jogou antes continua na classificação, zerado. (Ranking zerado em 09/10/2026.)
+DEFAULT_SINCE = "2026-10-09 12:00:00"
+
 
 def find_dbs(explicit_paths: list[str] | None) -> list[Path]:
     if explicit_paths:
@@ -290,6 +294,33 @@ def fetch_players(maps: list[dict], min_rounds: int, confidence: int = 100) -> l
     for i, p in enumerate(players, start=1):
         p["rank"] = i
     return players
+
+
+def zeroed_player(steamid: str, name: str) -> dict:
+    """Jogador de temporada anterior que ainda não jogou nesta: aparece na tabela com tudo zerado."""
+    p = {k: 0 for k in (
+        "matches", "maps", "rounds", "kills", "deaths", "assists", "damage", "kd", "kpr", "adr",
+        "hs_pct", "multi_kills", "clutch_won", "clutch_att", "clutch_pct", "wins", "losses",
+        "win_pct", "k3", "k4", "aces", "raw_rating", "rating",
+    )}
+    return {**p, "name": name or "(desconhecido)", "steamid64": steamid, "history": []}
+
+
+def add_zeroed(players: list[dict], old_maps: list[dict]) -> list[dict]:
+    """Junta os jogadores das temporadas anteriores (nome mais recente) que ainda não jogaram nesta."""
+    names: dict[str, tuple[str, str]] = {}
+    for m in old_maps:
+        for r in m["players"]:
+            sid, when = str(r["steamid64"]), m["start_time"] or ""
+            if sid not in names or when >= names[sid][0]:
+                names[sid] = (when, r["name"])
+    have = {p["steamid64"] for p in players}
+    zeroed = [zeroed_player(sid, n) for sid, (_, n) in names.items() if sid not in have]
+    zeroed.sort(key=lambda p: p["name"].lower())
+    out = players + zeroed
+    for i, p in enumerate(out, start=1):
+        p["rank"] = i
+    return out
 
 
 def team_label(raw: str) -> str:
@@ -1382,7 +1413,7 @@ function setScope(id) {
 }
 
 function visiblePlayers() {
-  return ALL.filter((p) => p.matches >= state.minMaps)
+  return ALL.filter((p) => state.minMaps <= 1 || p.matches >= state.minMaps)
     .slice()
     .sort((a, b) => b.wins - a.wins || b.win_pct - a.win_pct || b.rating - a.rating)
     .map((p, i) => Object.assign({}, p, { rank: i + 1 }));
@@ -1704,7 +1735,7 @@ function renderTable(list) {
 
   $("tbody").innerHTML = rows.length
     ? rows.map((p) =>
-        '<tr class="row' + (p.rank <= 3 ? " r" + p.rank : "") + '" data-player="' + p.steamid64 + '">' +
+        '<tr class="row' + (p.rank <= 3 && p.matches ? " r" + p.rank : "") + '" data-player="' + p.steamid64 + '">' +
         COLUMNS.map((c) => '<td class="' + (c.cls || "") + (c.key === "_go" ? " chev" : "") + '">' + cell(p, c.key) + "</td>").join("") +
         "</tr>").join("")
     : '<tr><td class="empty" colspan="' + COLUMNS.length + '">Nenhum jogador encontrado.</td></tr>';
@@ -2047,11 +2078,13 @@ $("footer").innerHTML =
 /* ---------- tudo ---------- */
 function renderAll() {
   const list = visiblePlayers();
+  // quem ainda não jogou nesta temporada (zerado) só aparece na classificação
+  const played = list.filter((p) => p.matches > 0);
   renderSeg();
-  renderPodium(list);
-  renderAwards(list);
-  renderForms(list);
-  renderScatter(list);
+  renderPodium(played);
+  renderAwards(played);
+  renderForms(played);
+  renderScatter(played);
   renderTable(list);
 }
 function renderScope() {
@@ -2066,7 +2099,7 @@ $("search").addEventListener("input", (e) => {
   state.q = e.target.value.trim().toLowerCase();
   const list = visiblePlayers();
   renderTable(list);
-  renderScatter(list);
+  renderScatter(list.filter((p) => p.matches > 0));
 });
 setScope("all");
 </script>
@@ -2116,11 +2149,20 @@ def main():
         help="Rounds de 'peso de confiança' do MixScore: quem jogou menos que isso fica mais "
         "perto da média do mix (padrão: 100, ~5 mapas; 0 desliga).",
     )
+    ap.add_argument(
+        "--desde",
+        default=DEFAULT_SINCE,
+        help=f"Só conta mapas começados a partir desta data/hora (padrão: {DEFAULT_SINCE}). "
+        "Quem jogou antes aparece zerado. Use --desde '' pra contar tudo.",
+    )
     args = ap.parse_args()
 
     db_paths = find_dbs(args.db)
-    all_maps = load_maps(db_paths, args.team_size)
+    loaded = load_maps(db_paths, args.team_size)
+    all_maps = [m for m in loaded if (m["start_time"] or "") >= args.desde]
+    old_maps = [m for m in loaded if (m["start_time"] or "") < args.desde]
     everything = build_scope(all_maps, args.min_rounds, args.confianca, min_pair_games=3)
+    everything["players"] = add_zeroed(everything["players"], old_maps)
 
     if not everything["players"]:
         sys.exit(
@@ -2130,7 +2172,7 @@ def main():
 
     nights = split_nights(all_maps)
     dates = [n[0]["start_time"] for n in nights]
-    period = f"{night_label(nights[0])} a {dates[-1][8:10]}/{dates[-1][5:7]}" if nights else ""
+    period = f"{night_label(nights[0])} a {dates[-1][8:10]}/{dates[-1][5:7]}" if nights else "a partir de " + args.desde[8:10] + "/" + args.desde[5:7]
     scopes = [{"id": "all", "label": "Todas as noites", "period": period, **everything}]
     # noites da mais recente pra mais antiga; o MixScore de cada noite usa só os mapas dela
     for night in reversed(nights):

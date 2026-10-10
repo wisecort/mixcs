@@ -88,6 +88,7 @@ for p in ps[:5]: print(p['rank'], p['name'], p['wins'], 'V', p['losses'], 'D', p
 | `--min-rounds N` | `10` | Esconde quem jogou menos de N rounds no total |
 | `--team-size N` | `5` | Mínimo de jogadores por time pro mapa contar (ex: `4` aceita 4x4) |
 | `--confianca N` | `100` | Peso de confiança do MixScore em rounds; `0` desliga |
+| `--desde "AAAA-MM-DD HH:MM:SS"` | `DEFAULT_SINCE` no script (`2026-10-09 12:00:00`) | Início da temporada: mapas antes disso não contam; quem jogou antes aparece zerado. `--desde ''` conta tudo |
 
 Exemplos:
 

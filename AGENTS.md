@@ -50,6 +50,8 @@ Detalhes, comandos prontos e casos especiais: **`docs/uso-diario.md`**.
 - Só contam mapas **finalizados** (com vencedor e `end_time`) com os **dois times completos**
   (`--team-size`, padrão 5). `Spectator` com tudo zerado é ignorado; `Spectator` com
   kills/mortes/dano jogou e volta pro time desfalcado (`resolve_roster()`).
+- **Temporada:** o ranking foi zerado em 09/10/2026. Só contam mapas a partir de `DEFAULT_SINCE`
+  (`--desde`); quem jogou antes continua na classificação com tudo zerado (fora de pódio/destaques).
 - MixScore tem **peso de confiança** (`--confianca`, padrão 100 rounds) pra quem jogou pouco
   não aparecer no topo.
 - Destaques só consideram quem tem **100+ rounds** (mesmo valor do `--confianca`).
