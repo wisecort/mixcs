@@ -28,6 +28,10 @@ mv "matchzy (1).db" matchzy.db
 > Se o banco novo vier idêntico ao commitado (`git status` não mostra `matchzy.db`), avise o dono:
 > quase sempre é a partida nova presa no `-wal` do servidor.
 
+> **Servidor resetado em 25/10/2026.** O banco antigo (até 25/10) ficou salvo como
+> `matchzyold.db` e o script o inclui sozinho junto com o `matchzy.db` — não apague nem
+> substitua esse arquivo; o banco novo do servidor continua indo em `matchzy.db`.
+
 > O banco do servidor é **acumulativo**: o arquivo novo já contém as partidas antigas.
 > Só use vários bancos juntos (§ 4) se o servidor tiver sido **resetado** e o banco antigo
 > tiver ficado salvo à parte.

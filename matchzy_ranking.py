@@ -31,6 +31,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+OLD_DB = "matchzyold.db"
 DEFAULT_DB_CANDIDATES = [
     "matchzy.db",
     "csgo/addons/counterstrikesharp/plugins/MatchZy/matchzy.db",
@@ -51,10 +52,13 @@ def find_dbs(explicit_paths: list[str] | None) -> list[Path]:
                 sys.exit(f"Banco não encontrado em: {p}")
             paths.append(p)
         return paths
+    # servidor resetado em 25/10/2026: o banco anterior fica salvo como matchzyold.db
+    # e entra junto automaticamente
+    old = [Path(OLD_DB)] if Path(OLD_DB).exists() else []
     for candidate in DEFAULT_DB_CANDIDATES:
         p = Path(candidate)
         if p.exists():
-            return [p]
+            return old + [p]
     sys.exit(
         "Não encontrei o matchzy.db automaticamente.\n"
         "Rode de novo com --db apontando pro arquivo, por exemplo:\n"
