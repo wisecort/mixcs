@@ -7,8 +7,12 @@ Passo a passo pra atualizar o ranking depois de uma sessão de mix.
 O banco do MatchZy fica no servidor em:
 
 ```
-csgo/addons/counterstrikesharp/plugins/MatchZy/matchzy.db
+csgo/addons/counterstrikesharp/plugins/disabled/MatchZy/matchzy.db
 ```
+
+(Fica em `plugins/disabled/` quando o GameModeManager troca o modo de jogo; se não estiver lá,
+procure em `plugins/MatchZy/`.) Baixe **pelo painel**: a API da FireGames (`files/contents`) só
+devolve texto e corrompe o `.db` binário — testado em 30/10/2026.
 
 Baixe e coloque na raiz do projeto como `matchzy.db`, substituindo o anterior.
 Se o navegador salvar como `matchzy (1).db`, renomeie:
